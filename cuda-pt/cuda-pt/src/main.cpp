@@ -4,14 +4,17 @@
 #include "window.h"
 //
 //#include "cudaGL.h"
+#include <cuda_runtime.h>
 #include "cuda_gl_interop.h"
 
 #include <iostream>
 
-cudaError_t dostuff(void *ptr);
+#include "camera.h"
 
+cudaError_t dostuff(void *ptr, Camera *device_camera);
+
+#define PI 3.14159265359
 #define CUDA_CALL(x) if(x != cudaSuccess) { exit(1); }
-
 #define GL_CALL(x) if(x != GL_NO_ERROR) { exit(1); } 
 
 
@@ -66,7 +69,7 @@ int main(int argc, char **argv)
 
 	HGLRC glc = wglCreateContext(hDc);
 	wglMakeCurrent(hDc, glc);
-
+	
 	GL_CALL(glewInit())
 
 	glViewport(0, 0, 800, 600);
@@ -105,9 +108,16 @@ int main(int argc, char **argv)
 	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);	GL_CALL(glGetError())	void *cudaMemory;
 
+	Camera c(Vector3d(0,0,0), Vector3d(0, 0, -1), Vector3d(0, 1, 0), PI / 4.0, 800.0 / 600.0, Vector2i(800, 600), 10);
+
+	Camera *device_c;
+	CUDA_CALL(cudaMalloc(&device_c, sizeof(Camera)));
 	
+	
+	//CUDA_CALL(cudaMalloc
 
-
+	int x = 0;
+	int y = 0;
 	bool running = true;
 	while(running)
 	{
@@ -117,12 +127,24 @@ int main(int argc, char **argv)
 			if(e.type == SDL_QUIT)
 				running = false;
 		}
+		int numKeys;
+		const Uint8 *data = SDL_GetKeyboardState(&numKeys);
+		if(data[SDL_SCANCODE_LEFT])
+			x--;
+		if(data[SDL_SCANCODE_RIGHT])
+			x++;
+		if(data[SDL_SCANCODE_UP])
+			y++;
+		if(data[SDL_SCANCODE_DOWN])
+			y--;
+		CUDA_CALL(cudaGLMapBufferObject(&cudaMemory, bufferID));
 
+		c.set_position(Vector3d(x, y, 0));
+		c.update();
 
+		CUDA_CALL(cudaMemcpy(device_c, &c, sizeof(Camera), cudaMemcpyHostToDevice));
 
-		CUDA_CALL(cudaGLMapBufferObject(&cudaMemory, bufferID))
-
-		dostuff(cudaMemory);
+		dostuff(cudaMemory, device_c);
 
 		CUDA_CALL(cudaGLUnmapBufferObject(bufferID))
 

@@ -1,4 +1,5 @@
 #include "cuda_helpers.h"
+#include "cuda.h"
 #include "driver_types.h"
 #include <SDL.h>
 #include <sstream>
@@ -8,6 +9,14 @@ void reportErrorAndDie(cudaError_t error, const char *file, int line)
 {
 	std::stringstream ss;
 	ss << file << ":" << line << " - CUDA call returned error: " << cudaErrorToString(error);
+	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "CUDA PT Error", ss.str().c_str(), NULL);
+	exit(EXIT_FAILURE);
+}
+
+void reportCudaDriverErrorAndDie(CUresult error, const char *file, int line)
+{
+	std::stringstream ss;
+	ss << file << ":" << line << " - CUDA Driver call returned error: " << error;
 	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "CUDA PT Error", ss.str().c_str(), NULL);
 	exit(EXIT_FAILURE);
 }

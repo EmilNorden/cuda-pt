@@ -1,6 +1,7 @@
 #ifndef CAMERA_H_
 #define CAMERA_H_
 
+#include "curand_kernel.h"
 #include "cuda_helpers.h"
 #include "vector3.h"
 #include "vector2.h"
@@ -51,6 +52,10 @@ public:
 		return position_;
 	}
 
+	void set_direction(const Vector3d &dir) {
+		direction_ = dir;
+	}
+
 	const Vector3d direction() const {
 		return direction_;
 	}
@@ -66,7 +71,7 @@ public:
 	CUDA_CALLABLE void cast_ray(Ray &ray, int x, int y) const;
 	CUDA_CALLABLE void cast_ray(Ray *ray, int x, int y) const;
 
-	CUDA_CALLABLE void cast_perturbed_ray(Ray *ray, int x, int y, double radius, MTRand &mt_rand) const;
+	__device__ void cast_perturbed_ray(Ray &ray, int x, int y, double radius, curandState &rand_state) const;
 
 	void update();
 };

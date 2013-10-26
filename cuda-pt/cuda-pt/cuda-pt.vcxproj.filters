@@ -30,6 +30,9 @@
     <ClCompile Include="src\cuda_helpers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\mouse_device.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\window.h">
@@ -66,6 +69,12 @@
       <Filter>Header files</Filter>
     </ClInclude>
     <ClInclude Include="src\static_uniform_heap.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\gametime.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\mouse_device.h">
       <Filter>Header files</Filter>
     </ClInclude>
   </ItemGroup>

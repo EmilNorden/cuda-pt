@@ -1,6 +1,7 @@
 #ifndef VECTOR3_H_
 #define VECTOR3_H_
 
+#include "curand_kernel.h"
 #include "cuda_helpers.h"
 #include <cmath>
 #include <cstdlib>
@@ -185,6 +186,30 @@ public:
 		v_[0] = -v_[0];
 		v_[1] = -v_[1];
 		v_[2] = -v_[2];
+	}
+
+	__device__ static Vector3 rand_unit_in_hemisphere(const Vector3 &normal, curandState &state)
+	{
+
+		//double mt_x = ((rand() / (double)RAND_MAX) * 2) - 1.0;
+		//double mt_y = ((rand() / (double)RAND_MAX) * 2) - 1.0;
+		//double mt_z = ((rand() / (double)RAND_MAX) * 2) - 1.0;
+		
+		double mt_x = (curand_uniform(&state) * 2) - 1.0;
+		double mt_y = (curand_uniform(&state) * 2) - 1.0;
+		double mt_z = (curand_uniform(&state) * 2) - 1.0;
+
+		Vector3 vector(mt_x, mt_y, mt_z);
+		vector.normalize();
+
+		if(vector.dot(normal) < 0)
+		{
+			vector.x() = -vector.x();
+			vector.y() = -vector.y();
+			vector.z() = -vector.z();
+		}
+
+		return vector;
 	}
 };
 

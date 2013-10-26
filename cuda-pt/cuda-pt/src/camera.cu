@@ -50,22 +50,18 @@ void Camera::cast_ray(Ray &ray, int x, int y) const {
 	ray.direction_.normalize();
 }
 
-void Camera::cast_perturbed_ray(Ray *ray, int x, int y, double radius, MTRand &mt_rand) const
+__device__ void Camera::cast_perturbed_ray(Ray &ray, int x, int y, double radius, curandState &rand_state) const
 {
 	cast_ray(ray, x, y);
 
-	Vector3d focus_point = position_ + ray->direction_ * focal_length_;
+	Vector3d focus_point = position_ + ray.direction_ * focal_length_;
 
-	//double min = (double)mt_rand.min();
-	//double max = (double)mt_rand.max();
-	//double range = max - min;
-
-	double u_shift = mt_rand.randf(0, 1); //(((double)mt_rand() - min) / range); //(MathUtil::get_rand()  * radius) - (radius / 2.0);
-	double v_shift = mt_rand.randf(0, 1); //(((double)mt_rand() - min) / range); //(MathUtil::get_rand()  * radius) - (radius / 2.0);
+	double u_shift = curand_uniform(&rand_state); //(((double)mt_rand() - min) / range); //(MathUtil::get_rand()  * radius) - (radius / 2.0);
+	double v_shift = curand_uniform(&rand_state); //(((double)mt_rand() - min) / range); //(MathUtil::get_rand()  * radius) - (radius / 2.0);
 
 	double r = radius;
 
-	ray->origin_ = position_ - (u_ * (r/2)) - (v_ * (r/2)) + (u_ * r * u_shift) + (v_ * r * v_shift);
-	ray->direction_ = focus_point - ray->origin_;
-	ray->direction_.normalize();
+	ray.origin_ = position_ - (u_ * (r/2)) - (v_ * (r/2)) + (u_ * r * u_shift) + (v_ * r * v_shift);
+	ray.direction_ = focus_point - ray.origin_;
+	ray.direction_.normalize();
 }

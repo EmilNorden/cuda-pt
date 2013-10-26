@@ -4,18 +4,22 @@
 #include "window.h"
 //
 //#include "cudaGL.h"
+#include "cuda_helpers.h"
 #include <cuda_runtime.h>
+#include <cuda.h>
 #include "cuda_gl_interop.h"
+#include "stack.h"
 
 #include <iostream>
 
 #include "camera.h"
 
-cudaError_t dostuff(void *ptr, Camera *device_camera);
+cudaError_t dostuff(void *ptr, Camera *device_camera, int seed, Vector3d *light_d, int sample, Vector3d *buffer_d);
+cudaError_t clearBuffer(Vector3d *ptr);
 
 #define PI 3.14159265359
-#define CUDA_CALL(x) if(x != cudaSuccess) { exit(1); }
-#define GL_CALL(x) if(x != GL_NO_ERROR) { exit(1); } 
+//#define CUDA_CALL(x) if(x != cudaSuccess) { exit(1); }
+//#define GL_CALL(x) if(x != GL_NO_ERROR) { exit(1); } 
 
 
 int main(int argc, char **argv)
@@ -94,7 +98,15 @@ int main(int argc, char **argv)
 	// Make this the current UNPACK buffer (OpenGL is state-based)
 	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, bufferID);
 	// Allocate data for the buffer
-	glBufferData(GL_PIXEL_UNPACK_BUFFER, 800 * 600 * 4, 		NULL, GL_DYNAMIC_COPY);	CUDA_CALL(cudaGLRegisterBufferObject(bufferID))	GLuint textureID;	// Enable Texturing
+	glBufferData(GL_PIXEL_UNPACK_BUFFER, 800 * 600 * 4 * 4, 
+		NULL, GL_DYNAMIC_COPY);
+
+
+	CUDA_CALL(cudaGLRegisterBufferObject(bufferID))
+
+	GLuint textureID;
+
+	// Enable Texturing
 	glEnable(GL_TEXTURE_2D);
 	// Generate a texture ID
 	glGenTextures(1,&textureID); 
@@ -102,20 +114,44 @@ int main(int argc, char **argv)
 	glBindTexture( GL_TEXTURE_2D, textureID); 
 	// Allocate the texture memory. The last parameter is NULL since we only
 	// want to allocate memory, not initialize it 
-	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA8, 800, 600, 0, GL_BGRA, 
-	GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA8, 800, 600, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	GLenum enu = glGetError();
+	GL_CALL(enu);
+	//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32UI, 800, 600, 0, GL_RGBA, GL_UNSIGNED_INT, NULL);
+	//glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB32F, 800, 600, 0, GL_RGB, GL_FLOAT, NULL);
+	enu = glGetError();
+	GL_CALL(enu);
 	// Must set the filter mode, GL_LINEAR enables interpolation when scaling 
 	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);	GL_CALL(glGetError())	void *cudaMemory;
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
 
+	enu = glGetError();
+	GL_CALL(enu)
+
+	void *cudaMemory;
+	int i = GL_INVALID_OPERATION;
 	Camera c(Vector3d(0,0,0), Vector3d(0, 0, -1), Vector3d(0, 1, 0), PI / 4.0, 800.0 / 600.0, Vector2i(800, 600), 10);
 
-	Camera *device_c;
+	Camera *device_c; 
 	CUDA_CALL(cudaMalloc(&device_c, sizeof(Camera)));
-	
-	
-	//CUDA_CALL(cudaMalloc
 
+	/* Set CUDA Data Stack size */
+	size_t limit;
+	CUresult result = cuCtxGetLimit(&limit, CU_LIMIT_STACK_SIZE);
+	// Assert result later
+	limit *= 3;
+	result = cuCtxSetLimit(CU_LIMIT_STACK_SIZE, limit);
+	// Assert result later
+	Vector3d light_h (-11, 10, -60);
+
+	Vector3d *light_d;
+	CUDA_CALL(cudaMalloc(&light_d, sizeof(Vector3d)));
+
+	Vector3d *buffer_d;
+	CUDA_CALL(cudaMalloc(&buffer_d, sizeof(Vector3d) * 800 * 600));
+
+	bool frame_changed = false;
+	int sample = 0;
 	int x = 0;
 	int y = 0;
 	bool running = true;
@@ -130,21 +166,52 @@ int main(int argc, char **argv)
 		int numKeys;
 		const Uint8 *data = SDL_GetKeyboardState(&numKeys);
 		if(data[SDL_SCANCODE_LEFT])
-			x--;
+		{
+			frame_changed = true;
+			light_h.x()--;//x--;
+		}
 		if(data[SDL_SCANCODE_RIGHT])
-			x++;
+		{
+			frame_changed = true;
+			light_h.x()++; //x++;
+		}
 		if(data[SDL_SCANCODE_UP])
-			y++;
+		{
+			frame_changed = true;
+			light_h.y()++;//y++;
+		}
 		if(data[SDL_SCANCODE_DOWN])
-			y--;
+		{
+			frame_changed = true;
+			light_h.y()--;//y--;
+		}
+		if(data[SDL_SCANCODE_W])
+		{
+			frame_changed = true;
+			light_h.z()--;
+		}
+		if(data[SDL_SCANCODE_S])
+		{
+			frame_changed = true;
+			light_h.z()++;
+		}
+
 		CUDA_CALL(cudaGLMapBufferObject(&cudaMemory, bufferID));
 
-		c.set_position(Vector3d(x, y, 0));
+		//c.set_position(Vector3d(x, y, 0));
 		c.update();
-
 		CUDA_CALL(cudaMemcpy(device_c, &c, sizeof(Camera), cudaMemcpyHostToDevice));
+		CUDA_CALL(cudaMemcpy(light_d, &light_h, sizeof(Vector3d), cudaMemcpyHostToDevice));
 
-		dostuff(cudaMemory, device_c);
+		if(frame_changed)
+		{
+			frame_changed = false;
+			sample = 0;
+
+			//clearBuffer(buffer_d);
+		}
+
+		dostuff(cudaMemory, device_c, static_cast<int>(SDL_GetTicks()), light_d, sample++, buffer_d);
 
 		CUDA_CALL(cudaGLUnmapBufferObject(bufferID))
 
@@ -154,7 +221,12 @@ int main(int argc, char **argv)
 		glBindTexture( GL_TEXTURE_2D, textureID);
 		// Make a texture from the buffer
 		glTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, 800, 600,
-		GL_BGRA, GL_UNSIGNED_BYTE, NULL);		GL_CALL(glGetError())		glBegin(GL_QUADS);
+		GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+
+		GL_CALL(glGetError());
+
+		
+		glBegin(GL_QUADS);
 			glTexCoord2f( 0, 1.0f); 
 			glVertex3f(0,0,0);
 			glTexCoord2f(0,0);
@@ -163,7 +235,8 @@ int main(int argc, char **argv)
 			glVertex3f(1.0f,1.0f,0);
 			glTexCoord2f(1.0f,1.0f);
 			glVertex3f(1.0f,0,0);
-		glEnd();
+		glEnd();
+
 		GL_CALL(glGetError())
 		
 		SwapBuffers(hDc);

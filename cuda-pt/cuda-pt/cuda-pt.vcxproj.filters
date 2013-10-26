@@ -8,6 +8,9 @@
     <CudaCompile Include="src\camera.cu">
       <Filter>Source Files</Filter>
     </CudaCompile>
+    <CudaCompile Include="src\stack.cu">
+      <Filter>Source Files</Filter>
+    </CudaCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Header files">
@@ -22,6 +25,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\window.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\cuda_helpers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -45,6 +51,21 @@
       <Filter>Header files</Filter>
     </ClInclude>
     <ClInclude Include="src\test.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\mtrand.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\intersectioninfo.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\stack.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\static_stack.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\static_uniform_heap.h">
       <Filter>Header files</Filter>
     </ClInclude>
   </ItemGroup>

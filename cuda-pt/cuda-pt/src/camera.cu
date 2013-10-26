@@ -1,5 +1,7 @@
 #include "camera.h"
 #include "vector2.h"
+#include "mtrand.h"
+#include "ray.h"
 
 void Camera::CalculateN()
 {
@@ -34,6 +36,13 @@ void Camera::update() {
 	pixel_height_ = image_plane_height_ / resolution_.y();
 }
 
+void Camera::cast_ray(Ray *ray, int x, int y) const {
+	ray->origin_ = position_;
+
+	ray->direction_ = (image_plane_start_ - (u_ * pixel_width_ * (double)x) + (v_ * pixel_height_ * (double)y)) - position_;
+	ray->direction_.normalize();
+}
+
 void Camera::cast_ray(Ray &ray, int x, int y) const {
 	ray.origin_ = position_;
 
@@ -41,22 +50,22 @@ void Camera::cast_ray(Ray &ray, int x, int y) const {
 	ray.direction_.normalize();
 }
 
-void Camera::cast_perturbed_ray(Ray &ray, int x, int y, double radius, std::shared_ptr<std::mt19937> &mt_rand) const
+void Camera::cast_perturbed_ray(Ray *ray, int x, int y, double radius, MTRand &mt_rand) const
 {
 	cast_ray(ray, x, y);
 
-	Vector3d focus_point = position_ + ray.direction_ * focal_length_;
+	Vector3d focus_point = position_ + ray->direction_ * focal_length_;
 
-	double min = (double)mt_rand->min();
-	double max = (double)mt_rand->max();
-	double range = max - min;
+	//double min = (double)mt_rand.min();
+	//double max = (double)mt_rand.max();
+	//double range = max - min;
 
-	double u_shift = (((double)mt_rand->operator()() - min) / range); //(MathUtil::get_rand()  * radius) - (radius / 2.0);
-	double v_shift = (((double)mt_rand->operator()() - min) / range); //(MathUtil::get_rand()  * radius) - (radius / 2.0);
+	double u_shift = mt_rand.randf(0, 1); //(((double)mt_rand() - min) / range); //(MathUtil::get_rand()  * radius) - (radius / 2.0);
+	double v_shift = mt_rand.randf(0, 1); //(((double)mt_rand() - min) / range); //(MathUtil::get_rand()  * radius) - (radius / 2.0);
 
 	double r = radius;
 
-	ray.origin_ = position_ - (u_ * (r/2)) - (v_ * (r/2)) + (u_ * r * u_shift) + (v_ * r * v_shift);
-	ray.direction_ = focus_point - ray.origin_;
-	ray.direction_.normalize();
+	ray->origin_ = position_ - (u_ * (r/2)) - (v_ * (r/2)) + (u_ * r * u_shift) + (v_ * r * v_shift);
+	ray->direction_ = focus_point - ray->origin_;
+	ray->direction_.normalize();
 }

@@ -8,6 +8,8 @@
 #include <exception>
 #include <random>
 
+class MTRand;
+
 class Camera
 {
 private:
@@ -53,7 +55,7 @@ public:
 		return direction_;
 	}
 
-	const double focal_length() const {
+	double focal_length() const {
 		return focal_length_;
 	}
 
@@ -62,8 +64,9 @@ public:
 	}
 
 	CUDA_CALLABLE void cast_ray(Ray &ray, int x, int y) const;
+	CUDA_CALLABLE void cast_ray(Ray *ray, int x, int y) const;
 
-	void cast_perturbed_ray(Ray &ray, int x, int y, double radius, std::shared_ptr<std::mt19937> &mt_rand) const;
+	CUDA_CALLABLE void cast_perturbed_ray(Ray *ray, int x, int y, double radius, MTRand &mt_rand) const;
 
 	void update();
 };

@@ -2,9 +2,6 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <CudaCompile Include="kernel.cu" />
-    <CudaCompile Include="src\test.cu">
-      <Filter>Source Files</Filter>
-    </CudaCompile>
     <CudaCompile Include="src\camera.cu">
       <Filter>Source Files</Filter>
     </CudaCompile>
@@ -50,15 +47,6 @@
     <ClInclude Include="src\ray.h">
       <Filter>Header files</Filter>
     </ClInclude>
-    <ClInclude Include="src\cuda_helpers.h">
-      <Filter>Header files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\test.h">
-      <Filter>Header files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\mtrand.h">
-      <Filter>Header files</Filter>
-    </ClInclude>
     <ClInclude Include="src\intersectioninfo.h">
       <Filter>Header files</Filter>
     </ClInclude>
@@ -75,6 +63,15 @@
       <Filter>Header files</Filter>
     </ClInclude>
     <ClInclude Include="src\mouse_device.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\shared_device_pointer.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\error_assertion.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\sphere.h">
       <Filter>Header files</Filter>
     </ClInclude>
   </ItemGroup>

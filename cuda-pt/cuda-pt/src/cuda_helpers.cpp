@@ -1,4 +1,4 @@
-#include "cuda_helpers.h"
+#include "error_assertion.h"
 #include "cuda.h"
 #include "driver_types.h"
 #include <SDL.h>

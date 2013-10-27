@@ -2,7 +2,7 @@
 #define VECTOR3_H_
 
 #include "curand_kernel.h"
-#include "cuda_helpers.h"
+#include "error_assertion.h"
 #include <cmath>
 #include <cstdlib>
 #include <random>

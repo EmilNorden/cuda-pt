@@ -2,7 +2,7 @@
 #define STACK_H_
 
 #include <cstring>
-#include "cuda_helpers.h"
+#include "error_assertion.h"
 
 template <typename T>
 class Stack

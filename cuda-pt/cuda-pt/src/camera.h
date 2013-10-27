@@ -2,7 +2,7 @@
 #define CAMERA_H_
 
 #include "curand_kernel.h"
-#include "cuda_helpers.h"
+#include "error_assertion.h"
 #include "vector3.h"
 #include "vector2.h"
 #include "ray.h"
@@ -33,8 +33,8 @@ private:
 	Vector3d image_plane_start_;
 
 
-	void CalculateN();
-	void CalculateUV();
+	void calculate_n();
+	void calculate_uv();
 public:
 
 	Camera(const Vector3d &pos, const Vector3d &dir, const Vector3d &up, const double fov, const double aspect_ratio, const Vector2i &resolution, double focal_length)
@@ -60,11 +60,11 @@ public:
 		return direction_;
 	}
 
-	double focal_length() const {
+	CUDA_CALLABLE double focal_length() const {
 		return focal_length_;
 	}
 
-	void set_focal_length(double value) {
+	CUDA_CALLABLE void set_focal_length(double value) {
 		focal_length_ = value;
 	}
 

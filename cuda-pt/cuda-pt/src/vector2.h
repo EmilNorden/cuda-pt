@@ -1,35 +1,37 @@
 #ifndef VECTOR2_H_
 #define VECTOR2_H_
 
+#include "error_assertion.h"
+
 template <class T>
 class Vector2
 {
 private:
 	T v_[2];
 public:
-	Vector2() {
+	CUDA_CALLABLE Vector2() {
 		v_[0] = T();
 		v_[1] = T();
 	}
 
-	Vector2(T x, T y) {
+	CUDA_CALLABLE Vector2(T x, T y) {
 		v_[0] = x;
 		v_[1] = y;
 	}
 
-	T& x() {
+	CUDA_CALLABLE T& x() {
 		return v_[0];
 	}
 
-	T& y() {
+	CUDA_CALLABLE T& y() {
 		return v_[1];
 	}
 
-	T x() const {
+	CUDA_CALLABLE T x() const {
 		return v_[0];
 	}
 
-	T y() const {
+	CUDA_CALLABLE T y() const {
 		return v_[1];
 	}
 

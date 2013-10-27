@@ -3,8 +3,7 @@
 #include "SDL_syswm.h"
 #include "window.h"
 //
-//#include "cudaGL.h"
-#include "cuda_helpers.h"
+#include "error_assertion.h"
 #include <cuda_runtime.h>
 #include <cuda.h>
 #include "curand_kernel.h"
@@ -13,79 +12,44 @@
 
 #include <iostream>
 
+#include "sphere.h"
 #include "camera.h"
 #include "gametime.h"
 #include "mouse_device.h"
+#include "shared_device_pointer.h"
 
-cudaError_t dostuff(void *ptr, Camera *device_camera, int seed, Vector3d *light_d, int sample, Vector3d *buffer_d, curandState *state);
+cudaError_t setup_scene(Sphere **scene, int *nSpheres);
+cudaError_t focus_camera(Camera *device_camera, const Vector2i *focus_point_d, Sphere **scene, int nSpheres);
+cudaError_t ray_trace(void *ptr, Camera *device_camera, int sample, Vector3d *buffer_d, curandState *state, const Vector2i &resolution_h, const Vector2i *resolution, Sphere **scene, int nSpheres);
 cudaError_t clearBuffer(Vector3d *ptr);
-cudaError_t init_curand(curandState *rand_state_d, unsigned long *seeds);
+cudaError_t init_curand(curandState *rand_state_d, unsigned long *seeds, const Vector2i &resolution_h, const Vector2i *resolution);
 
 #define PI 3.14159265359
-//#define CUDA_CALL(x) if(x != cudaSuccess) { exit(1); }
-//#define GL_CALL(x) if(x != GL_NO_ERROR) { exit(1); } 
 
-#define RESOLUTION_WIDTH	800
-#define RESOLUTION_HEIGHT	600
+#define RESOLUTION_WIDTH	1280
+#define RESOLUTION_HEIGHT	720
 
+Vector2i resolution_h(RESOLUTION_WIDTH, RESOLUTION_HEIGHT);
 
-int main(int argc, char **argv)
+GLuint	bufferID;
+GLuint	textureID;
+int		nSpheres;
+
+// Device memory pointers
+Camera		*camera_d; 
+Vector3d	*accu_buffer_d;
+curandState *rand_state_d;
+Vector2i	*resolution_d;
+Vector2i	*focus_point_d;
+Sphere		**scene_d;
+
+SDL_GLContext init_gl(SDLWindow &window)
 {
-	SDL_SysWMinfo info;
-
-	std::cout << "Initializing SDL\n";
-	SDL_Init(SDL_INIT_EVERYTHING);
-
-	SDLWindow window(SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 800, 600, "CUDA Pathtracing");
-	SDL_VERSION(&info.version);
-	
-	 if(!SDL_GetWindowWMInfo(window.get(),&info))
-	 {
-		 std::cout << "SDL_GetWindowWMInfo failed.\n";
-		 exit(1);
-	 }
-
-	 std::cout << "Initializing OpenGL...\n";
-	static PIXELFORMATDESCRIPTOR pfd2;
-	
-	pfd2.nSize = sizeof(PIXELFORMATDESCRIPTOR);
-
-	static PIXELFORMATDESCRIPTOR pfd=
-	{
-		sizeof(PIXELFORMATDESCRIPTOR), // Size Of This Pixel Format Descriptor
-		1, // Version Number
-		PFD_DRAW_TO_WINDOW | // Format Must Support Window
-		PFD_SUPPORT_OPENGL | // Format Must Support OpenGL
-		PFD_DOUBLEBUFFER, // Must Support Double Buffering
-		PFD_TYPE_RGBA, // Request An RGBA Format
-		8, // Select Our Color Depth, 8 bits / channel
-		0, 0, 0, 0, 0, 0, // Color Bits Ignored
-		0, // No Alpha Buffer
-		0, // Shift Bit Ignored
-		0, // No Accumulation Buffer
-		0, 0, 0, 0, // Accumulation Bits Ignored
-		32, // 32 bit Z-Buffer (Depth Buffer) 
-		0, // No Stencil Buffer
-		0, // No Auxiliary Buffer
-		PFD_MAIN_PLANE, // Main Drawing Layer
-		0, // Reserved
-		0, 0, 0 // Layer Masks Ignored
-	};
-
-	HWND hWnd = info.info.win.window;
-
-	HDC hDc = GetDC(hWnd);
-
-	GLuint pixel_format = ChoosePixelFormat(hDc, &pfd);
-
-	SetPixelFormat(hDc, pixel_format, &pfd);
-
-	HGLRC glc = wglCreateContext(hDc);
-	wglMakeCurrent(hDc, glc);
+	SDL_GLContext context = SDL_GL_CreateContext(window.get());
 	
 	GL_CALL(glewInit())
 
-	glViewport(0, 0, 800, 600);
+	glViewport(0, 0, RESOLUTION_WIDTH, RESOLUTION_HEIGHT);
 
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
@@ -93,28 +57,17 @@ int main(int argc, char **argv)
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
-	//glEnable(GL_DEPTH_TEST); // ?? Should this not be disabled?
+	glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 
-	glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
+	GL_CALL(glGetError());
 
-	GL_CALL(glGetError())
-	
-	std::cout << "Initializing CUDA...\n";
-	CUDA_CALL(cudaGLSetGLDevice(0))
-	
-	GLuint bufferID;
 	// Generate a buffer ID
 	glGenBuffers(1,&bufferID); 
 	// Make this the current UNPACK buffer (OpenGL is state-based)
 	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, bufferID);
 	// Allocate data for the buffer
-	glBufferData(GL_PIXEL_UNPACK_BUFFER, 800 * 600 * 4 * 4, 
+	glBufferData(GL_PIXEL_UNPACK_BUFFER, RESOLUTION_WIDTH * RESOLUTION_HEIGHT * 4 * 4, 
 		NULL, GL_DYNAMIC_COPY);
-
-
-	CUDA_CALL(cudaGLRegisterBufferObject(bufferID))
-
-	GLuint textureID;
 
 	// Enable Texturing
 	glEnable(GL_TEXTURE_2D);
@@ -124,82 +77,116 @@ int main(int argc, char **argv)
 	glBindTexture( GL_TEXTURE_2D, textureID); 
 	// Allocate the texture memory. The last parameter is NULL since we only
 	// want to allocate memory, not initialize it 
-	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA8, 800, 600, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-	GLenum enu = glGetError();
-	GL_CALL(enu);
-	//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32UI, 800, 600, 0, GL_RGBA, GL_UNSIGNED_INT, NULL);
-	//glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB32F, 800, 600, 0, GL_RGB, GL_FLOAT, NULL);
-	enu = glGetError();
-	GL_CALL(enu);
+	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA8, RESOLUTION_WIDTH, RESOLUTION_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	
 	// Must set the filter mode, GL_LINEAR enables interpolation when scaling 
 	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+	GL_CALL(glGetError());
 
-	enu = glGetError();
-	GL_CALL(enu)
+	return context;
+}
 
-	void *cudaMemory;
+void init_cuda()
+{
+	CUDA_CALL(cudaGLSetGLDevice(0))
+	CUDA_CALL(cudaGLRegisterBufferObject(bufferID))
+
+	/* Set CUDA Data Stack size */
+	std::cout << "Setting CUDA Data stack size...\n";
+	size_t stack_size;
+	CUDA_DRIVER_CALL(cuCtxGetLimit(&stack_size, CU_LIMIT_STACK_SIZE))
+	stack_size *= 10;
+	CUDA_DRIVER_CALL(cuCtxSetLimit(CU_LIMIT_STACK_SIZE, stack_size));
+	std::cout << "Successfully set CUDA Data stack size to " << stack_size << "\n";
+
+	CUDA_CALL(cudaMalloc(&camera_d, sizeof(Camera)));
+
+	CUDA_CALL(cudaMalloc(&accu_buffer_d, sizeof(Vector3d) * RESOLUTION_WIDTH * RESOLUTION_HEIGHT));
+	CUDA_CALL(cudaMemset(accu_buffer_d, 0, sizeof(Vector3d) * RESOLUTION_WIDTH * RESOLUTION_HEIGHT));
+
+	CUDA_CALL(cudaMalloc(&resolution_d, sizeof(Vector2i)));
+	CUDA_CALL(cudaMemcpy(resolution_d, &resolution_h, sizeof(Vector2i), cudaMemcpyHostToDevice));
+}
+
+void init_curand()
+{
+	CUDA_CALL(cudaMalloc(&rand_state_d, sizeof(curandState) * RESOLUTION_WIDTH * RESOLUTION_HEIGHT));
+	unsigned long *seeds_h = new unsigned long[RESOLUTION_WIDTH * RESOLUTION_HEIGHT];
+	unsigned long *seeds_d;
+	for(int i = 0; i < RESOLUTION_WIDTH * RESOLUTION_HEIGHT; ++i)
+	{
+		seeds_h[i] = SDL_GetTicks() + i;
+	}
+
+	CUDA_CALL(cudaMalloc(&seeds_d, sizeof(unsigned long) * RESOLUTION_WIDTH * RESOLUTION_HEIGHT));
+	CUDA_CALL(cudaMemcpy(seeds_d, seeds_h, sizeof(unsigned long) * RESOLUTION_WIDTH * RESOLUTION_HEIGHT,  cudaMemcpyHostToDevice));
+	delete[] seeds_h;
+
+	CUDA_CALL(init_curand(rand_state_d, seeds_d, Vector2i(RESOLUTION_WIDTH, RESOLUTION_HEIGHT), resolution_d));
+}
+
+void init_scene()
+{
+	int *nSpheres_d;
+	cudaMalloc(&scene_d, sizeof(Sphere*));
+	cudaMalloc(&nSpheres_d, sizeof(int));
+
+	CUDA_CALL(setup_scene(scene_d, nSpheres_d));
+	CUDA_CALL(cudaMemcpy(&nSpheres, nSpheres_d, sizeof(int), cudaMemcpyDeviceToHost));
+	CUDA_CALL(cudaFree(nSpheres_d));
+}
+
+int main(int argc, char **argv)
+{
+	std::cout << "Initializing SDL\n";
+	SDL_Init(SDL_INIT_EVERYTHING);
+	SDLWindow window(SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, RESOLUTION_WIDTH, RESOLUTION_HEIGHT, false, "CUDA Pathtracing");
+
+	std::cout << "Initializing OpenGL...\n";
+	SDL_GLContext context = init_gl(window);
+
+	std::cout << "Initializing CUDA...\n";
+	init_cuda();
+
+	std::cout << "Initializing scene...\n";
+	init_scene();
+
+	// Camera setup
 	Vector3d cam_pos(0, 5, 20);
 	Vector3d cam_target = Vector3d(0, 0, 0) - cam_pos;
 	cam_target.normalize();
 
 	Vector3d focus_point(0, 1.5, 5);
 	double focal_length = (focus_point - cam_pos).length();
-	Camera c(cam_pos, cam_target, Vector3d(0, 1, 0), PI / 4.0, 800.0 / 600.0, Vector2i(800, 600), focal_length);
-
-	Camera *device_c; 
-	CUDA_CALL(cudaMalloc(&device_c, sizeof(Camera)));
-
-	/* Set CUDA Data Stack size */
-	std::cout << "Setting CUDA Data stack size...\n";
-	size_t limit;
-	CUDA_DRIVER_CALL(cuCtxGetLimit(&limit, CU_LIMIT_STACK_SIZE))
-	limit *= 10;
-	CUDA_DRIVER_CALL(cuCtxSetLimit(CU_LIMIT_STACK_SIZE, limit));
-	std::cout << "Successfully set CUDA Data stack size to " << limit << "\n";
-
-	Vector3d light_h (0, 10, 00);
-
-	Vector3d *light_d;
-	CUDA_CALL(cudaMalloc(&light_d, sizeof(Vector3d)));
-
-	Vector3d *buffer_d;
-	CUDA_CALL(cudaMalloc(&buffer_d, sizeof(Vector3d) * 800 * 600));
-	cudaMemset(buffer_d, 0, sizeof(Vector3d) * 800 * 600);
+	Camera camera_h(cam_pos, cam_target, Vector3d(0, 1, 0), PI / 4.0, (double)RESOLUTION_WIDTH / RESOLUTION_HEIGHT, Vector2i(RESOLUTION_WIDTH, RESOLUTION_HEIGHT), focal_length);
 
 	std::cout << "Initializing curand...\n";
 	/* Set up CURAND */
-	curandState *rand_state_d;
-	CUDA_CALL(cudaMalloc(&rand_state_d, sizeof(curandState) * 800 * 600));
-	unsigned long *seeds_h = new unsigned long[800 * 600];
-	unsigned long *seeds_d;
-	for(int i = 0; i < 800 * 600; ++i)
-	{
-		seeds_h[i] = SDL_GetTicks() + i;
-	}
-
-	CUDA_CALL(cudaMalloc(&seeds_d, sizeof(unsigned long) * 800 * 600));
-	CUDA_CALL(cudaMemcpy(seeds_d, seeds_h, sizeof(unsigned long) * 800 * 600,  cudaMemcpyHostToDevice));
-	delete[] seeds_h;
-
-	CUDA_CALL(init_curand(rand_state_d, seeds_d));
-
+	
+	init_curand();
+	
+	void *pixel_buffer_object_d;
 	MouseDevice mouse;
 	GameTime timer(SDL_GetTicks());
 	bool frame_changed = false;
 	int sample = 0;
 	bool running = true;
-	std::cout << "Done! Entering render loop\n";
+	
 	bool dragging = false;
-	double rot_x = PI;
-	double rot_y = PI;
-	Vector2i drag_coord;
+	double view_rot_x = PI;
+	double view_rot_y = PI;
+
+	Vector2i prev_mouse_coord;
+	
+	CUDA_CALL(cudaMalloc(&focus_point_d, sizeof(Vector2i)));
+
+	std::cout << "Done! Entering render loop\n";
 	while(running)
 	{
 		mouse.frame_update();
 		timer.frameUpdate(SDL_GetTicks());
 
-		Vector3d movement(0, 0, 0);
 		SDL_Event e;
 		while(SDL_PollEvent(&e))
 		{
@@ -208,35 +195,15 @@ int main(int argc, char **argv)
 		}
 		int numKeys;
 		const Uint8 *data = SDL_GetKeyboardState(&numKeys);
-		if(data[SDL_SCANCODE_LEFT])
-		{
-			frame_changed = true;
-			movement.x()--;//x--;
-		}
-		if(data[SDL_SCANCODE_RIGHT])
-		{
-			frame_changed = true;
-			movement.x()++; //x++;
-		}
-		if(data[SDL_SCANCODE_UP])
-		{
-			frame_changed = true;
-			movement.y()++;//y++;
-		}
-		if(data[SDL_SCANCODE_DOWN])
-		{
-			frame_changed = true;
-			movement.y()--;//y--;
-		}
 		if(data[SDL_SCANCODE_W])
 		{
 			frame_changed = true;
-			c.set_position(c.position() + c.direction());
+			camera_h.set_position(camera_h.position() + camera_h.direction());
 		}
 		if(data[SDL_SCANCODE_S])
 		{
 			frame_changed = true;
-			c.set_position(c.position() - c.direction());
+			camera_h.set_position(camera_h.position() - camera_h.direction());
 		}
 		if(data[SDL_SCANCODE_ESCAPE])
 		{
@@ -246,9 +213,8 @@ int main(int argc, char **argv)
 		if(mouse.left_button() & Pressed && mouse.left_button() & ChangedThisFrame)
 		{
 			dragging = true;
-			drag_coord.x() = mouse.x();
-			drag_coord.y() = mouse.y();
-			std::cout << "Begin drag!\n";
+			prev_mouse_coord.x() = mouse.x();
+			prev_mouse_coord.y() = mouse.y();
 		}
 		else if(mouse.left_button() & Released)
 		{
@@ -259,59 +225,58 @@ int main(int argc, char **argv)
 		{
 			frame_changed = true;
 			Vector2i mouse_pos(mouse.x(), mouse.y());
-			Vector2i diff = mouse_pos - drag_coord;
-			drag_coord = mouse_pos;
+			Vector2i diff = mouse_pos - prev_mouse_coord;
+			prev_mouse_coord = mouse_pos;
 
-			rot_x += diff.x() * 0.005;
-			rot_y += diff.y() * 0.005;
+			view_rot_x += diff.x() * 0.005;
+			view_rot_y += diff.y() * 0.005;
 
-			std::cout << "Rotation: " << rot_x << ", " << rot_y << "\n";
-			
-			Vector3d direction = Vector3d(std::sin(rot_x), 0, std::cos(rot_x)) + Vector3d(0, std::sin(rot_y), std::cos(rot_y));
+			Vector3d direction = Vector3d(std::sin(view_rot_x), 0, std::cos(view_rot_x)) + Vector3d(0, std::sin(view_rot_y), std::cos(view_rot_y));
 			direction.normalize();
-			c.set_direction(direction);
+			camera_h.set_direction(direction);
 		}
-
-
-
-		
 
 		if(frame_changed)
 		{
-			movement.multiply(timer.frameTime() * 0.01);
-
-			//c.set_position(c.position() + (c.direction() * movement));
-			light_h += movement;
+			// If anything has changed this frame,
+			// we need to set the sample count to 0 so
+			// that the pixex buffer object is completely overwritten with new data
 			frame_changed = false;
 			sample = 0;
-			//clearBuffer(buffer_d);
+
+			camera_h.update();
+			CUDA_CALL(cudaMemcpy(camera_d, &camera_h, sizeof(Camera), cudaMemcpyHostToDevice));
 		}
 
+		if(mouse.right_button() & Pressed && mouse.right_button() & ChangedThisFrame)
+		{
+			int mouse_x = mouse.x();
+			int mouse_y = mouse.y();
+			Vector2i window_size = window.get_size();
 
-		CUDA_CALL(cudaGLMapBufferObject(&cudaMemory, bufferID));
+			double normalized_x = mouse_x / (double)window_size.x();
+			double normalized_y = 1 - (mouse_y / (double)window_size.y());
 
-		//c.set_position(Vector3d(x, y, 0));
-		c.update();
-		//c.set_focal_length((light_h - c.position()).length());
-		CUDA_CALL(cudaMemcpy(device_c, &c, sizeof(Camera), cudaMemcpyHostToDevice));
-		CUDA_CALL(cudaMemcpy(light_d, &light_h, sizeof(Vector3d), cudaMemcpyHostToDevice));
+			Vector2i focus_point(RESOLUTION_WIDTH * normalized_x, RESOLUTION_HEIGHT * normalized_y);
+			CUDA_CALL(cudaMemcpy(focus_point_d, &focus_point, sizeof(Vector2i), cudaMemcpyHostToDevice));
 
-		
-		dostuff(cudaMemory, device_c, static_cast<int>(SDL_GetTicks()), light_d, sample++, buffer_d, rand_state_d);
+			focus_camera(camera_d, focus_point_d, scene_d, nSpheres);	
+			sample = 0;
+		}
+
+		CUDA_CALL(cudaGLMapBufferObject(&pixel_buffer_object_d, bufferID));
+
+		ray_trace(pixel_buffer_object_d, camera_d, sample++, accu_buffer_d, rand_state_d, resolution_h, resolution_d, scene_d, nSpheres);
 
 		CUDA_CALL(cudaGLUnmapBufferObject(bufferID))
 
-		// Select the appropriate buffer 
 		glBindBuffer( GL_PIXEL_UNPACK_BUFFER, bufferID); 
-		// Select the appropriate texture
 		glBindTexture( GL_TEXTURE_2D, textureID);
-		// Make a texture from the buffer
-		glTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, 800, 600,
+		glTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, RESOLUTION_WIDTH, RESOLUTION_HEIGHT,
 		GL_BGRA, GL_UNSIGNED_BYTE, NULL);
 
 		GL_CALL(glGetError());
 
-		
 		glBegin(GL_QUADS);
 			glTexCoord2f( 0, 0.0f); 
 			glVertex3f(0,0,0);
@@ -323,14 +288,26 @@ int main(int argc, char **argv)
 			glVertex3f(1.0f,0,0);
 		glEnd();
 
-		GL_CALL(glGetError())
+		GL_CALL(glGetError());
 		
-		SwapBuffers(hDc);
+		SDL_GL_SwapWindow(window.get());
 	}
 
-	CUDA_CALL(cudaGLUnregisterBufferObject(bufferID))
+	// CUDA cleanup
+	CUDA_CALL(cudaGLUnregisterBufferObject(bufferID));
+	CUDA_CALL(cudaDeviceReset());
 
+	cudaFree(camera_d);
+	cudaFree(accu_buffer_d);
+	cudaFree(resolution_d);
+	cudaFree(focus_point_d);
+
+	// GL cleanup
 	glDeleteBuffers(1, &bufferID);
+	glDeleteTextures(1, &textureID);
+
+	// SDL cleanup
+	SDL_GL_DeleteContext(context);
 
 	SDL_Quit();
 	return 0;

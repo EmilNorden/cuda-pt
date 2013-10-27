@@ -1,5 +1,5 @@
-#ifndef CUDA_HELPERS_H_
-#define CUDA_HELPERS_H_
+#ifndef ERROR_ASSERTION_H_
+#define ERROR_ASSERTION_H_
 
 #include "cuda.h"
 #include "driver_types.h"

@@ -5,29 +5,15 @@
 #include <stdio.h>
 #include <stack>
 
-#include "src/mtrand.h"
+#include "src/Sphere.h"
+
 #include "src/camera.h"
 
-#include "src/test.h"
 #include "src/intersectioninfo.h"
-
-#include "src/static_stack.h"
-#include "src/static_uniform_heap.h"
 
 #include <curand_kernel.h>
 
-
-class Sphere
-{
-public:
-	double radius;
-	Vector3d position;
-	Vector3d emissive;
-	Vector3d diffuse;
-	double refl_coeff;
-};
-
-__device__ void ray_trace(Ray &ray, Sphere *spheres, int nSpheres, int max_depth, Vector3d &color, curandState &rand_state);
+__device__ void trace(Ray &ray, Sphere *spheres, int nSpheres, int max_depth, Vector3d &color, curandState &rand_state);
 __device__ void shade(Ray &ray, const IntersectionInfo &ii, Sphere *spheres, int index, int nSpheres, int max_depth, Vector3d &color, curandState &rand_state);
 
 __device__ bool intersect(Ray &ray, const Sphere &sphere) {
@@ -70,33 +56,6 @@ __device__ bool intersect(Ray &ray, const Sphere &sphere, IntersectionInfo  &ii)
 	ii.surface_normal = ii.coordinate - sphere.position;
 
 	ii.surface_normal.normalize();
-
-
-	return true;
-}
-
-__device__ bool intersect(Ray *ray, const Sphere &sphere) {
-	double num1 = sphere.position.x() - ray->origin_.x();
-	double num2 = sphere.position.y() - ray->origin_.y();
-	double num3 = sphere.position.z() - ray->origin_.z();
-	double num4 = (num1 * num1 + num2 * num2 + num3 * num3);
-	double num5 = sphere.radius * sphere.radius;
-	
-	double num6 = (num1 * ray->direction_.x() + num2 * ray->direction_.y() + num3 * ray->direction_.z());
-
-	if (num6 < 0.0)
-	return false;
-	double num7 = num4 - num6 * num6;
-	if (num7 > num5)
-		return false;
-
-	double num8 = sqrt(num5 - num7);
-
-	ray->intersection.distance = abs(num6 - num8);
-	ray->intersection.coordinate = ray->origin_ + (ray->direction_ * ray->intersection.distance);
-	ray->intersection.surface_normal = ray->intersection.coordinate - sphere.position;
-
-	ray->intersection.surface_normal.normalize();
 
 
 	return true;
@@ -182,9 +141,6 @@ __device__ void shade(Ray &ray, const IntersectionInfo &ii, Sphere *spheres, int
 
 	color += spheres[index].emissive;
 
-	//// To be replaced with path tracing
-	//color += Vector3d(0.1, 0.1, 0.1);
-
 	// Path tracing
 	pathtrace(ray, ii, index, spheres, nSpheres, max_depth, color, rand_state);
 
@@ -217,40 +173,163 @@ __device__ void shade(Ray &ray, const IntersectionInfo &ii, Sphere *spheres, int
 		reflected_ray.direction_.normalize();
 
 		Vector3d refl_color;
-		ray_trace(reflected_ray, spheres, nSpheres, max_depth, refl_color, rand_state);
+		trace(reflected_ray, spheres, nSpheres, max_depth, refl_color, rand_state);
 		color += refl_color * spheres[index].refl_coeff;
 	}
 }
 
-__device__ void ray_trace(Ray &ray, Sphere *spheres, int nSpheres, int max_depth, Vector3d &color, curandState &rand_state)
+__device__ void trace(Ray &ray, Sphere *spheres, int nSpheres, int max_depth, Vector3d &color, curandState &rand_state)
 {
 	IntersectionInfo ii;
 	int sphere_index = get_intersected_sphere(ray, spheres, nSpheres, ii);
 
 	if(sphere_index != -1)
 	{
-		//color = best_ii.surface_normal;
 		shade(ray, ii, spheres, sphere_index, nSpheres, max_depth, color, rand_state);
 	}
 }
 
-__global__ void dostuff2(int *ptr, Camera *camera, int depth, Vector3d *light_d, int sample, Vector3d *buffer_d, curandState *rand_states)
+__global__ void raytrace_kernel(int *ptr, Camera *camera, int depth, int sample, Vector3d *buffer_d, curandState *rand_states, const Vector2i *resolution_d, Sphere **scene, int nSpheres)
 {
 	int index_x = blockIdx.x * blockDim.x + threadIdx.x;
 	int index_y = blockIdx.y * blockDim.y + threadIdx.y;
 
-	curandState &rand_state = rand_states[index_y * 800 + index_x];
+	curandState &rand_state = rand_states[index_y * resolution_d->x() + index_x];
 	Vector3d color;
 	Ray ray;
 	ray.depth_ = 0;
-	camera->cast_perturbed_ray(ray, index_x, index_y, 1.0, rand_state);
-	//camera->cast_ray(ray, index_x, index_y);
+	camera->cast_perturbed_ray(ray, index_x, index_y, 0.25, rand_state);
 
-	Sphere spheres[4];
+	Sphere *spheres = *scene;
+	//Sphere spheres[4];
+	//spheres[0].radius = 1;
+	//spheres[0].position.x() = 0;
+	//spheres[0].position.y() = 10;
+	//spheres[0].position.z() = 0;
+	//spheres[0].diffuse.x() = 1;
+	//spheres[0].diffuse.y() = 1;
+	//spheres[0].diffuse.z() = 1;
+	//spheres[0].emissive = Vector3d(0.4, 0.4, 0.4) * 200;
+	//spheres[0].refl_coeff = 0;
+
+	//spheres[1].radius = 1.5;
+	//spheres[1].position.x() = -4;
+	//spheres[1].position.y() = 1.5;
+	//spheres[1].position.z() = -5;
+	//spheres[1].diffuse.x() = 1;
+	//spheres[1].diffuse.y() = 1;
+	//spheres[1].diffuse.z() = 1;
+	//spheres[1].emissive = Vector3d(0.0, 0.0, 0.0);
+	//spheres[1].refl_coeff = 1.0;
+
+	//spheres[2].radius = 1.5;
+	//spheres[2].position.x() = 0;
+	//spheres[2].position.y() = 1.5;
+	//spheres[2].position.z() = 5;
+	//spheres[2].diffuse.x() = 1;
+	//spheres[2].diffuse.y() = 0;
+	//spheres[2].diffuse.z() = 0;
+	//spheres[2].emissive = Vector3d(0.0, 0.0, 0.0);
+	//spheres[2].refl_coeff = 0.25;
+
+	//spheres[3].radius = 400;
+	//spheres[3].position.x() = 0;
+	//spheres[3].position.y() = -400;
+	//spheres[3].position.z() = 0;
+	//spheres[3].diffuse.x() = 1;
+	//spheres[3].diffuse.y() = 1;
+	//spheres[3].diffuse.z() = 1;
+	//spheres[3].emissive = Vector3d(1.0, 1.0, 1.0) * 0.0;
+	//spheres[3].refl_coeff = 0.0;
+
+	//// Tiny red ball
+	//spheres[4].radius = 0.25;
+	//spheres[4].position.x() = -4;
+	//spheres[4].position.y() = 1.5;
+	//spheres[4].position.z() = -3.375;
+	//spheres[4].diffuse.x() = 1;
+	//spheres[4].diffuse.y() = 0;
+	//spheres[4].diffuse.z() = 0;
+	//spheres[4].emissive = Vector3d(0.0, 0.0, 0.0);
+	//spheres[4].refl_coeff = 0.0;
+
+	trace(ray, spheres, nSpheres, depth, color, rand_state);
+
+	color.clamp(Vector3d(0, 0, 0), Vector3d(1, 1, 1));
+
+	Vector3d &current_color = buffer_d[index_y * (resolution_d->x()) + index_x];
+	current_color.multiply(sample);
+	current_color += color;
+	current_color.multiply(1 / (double)(sample + 1));
+	ptr[index_y * resolution_d->x() + index_x] = 255 << 24 | static_cast<int>(current_color.x() * 255) << 16  | static_cast<int>(current_color.y() * 255) << 8 | static_cast<int>(current_color.z() * 255);
+}
+
+__global__ void focus_camera_kernel(Camera *camera, const Vector2i *focus_point, Sphere **scene, int nSpheres)
+{
+	Ray ray;
+	camera->cast_ray(ray, focus_point->x(), focus_point->y()); 
+	IntersectionInfo ii;
+	int sphere_index = get_intersected_sphere(ray, *scene, nSpheres, ii);
+	if(sphere_index != -1)
+	{
+		printf("[%d, %d] Clicked sphere %d at distance %f\n Current focal length is %f\n", focus_point->x(), focus_point->y(), sphere_index, ii.distance, camera->focal_length());
+		double diff = ii.distance - camera->focal_length();
+		camera->set_focal_length(ii.distance);
+	}
+}
+
+cudaError_t focus_camera(Camera *device_camera, const Vector2i *focus_point_d, Sphere **scene, int nSpheres)
+{
+	focus_camera_kernel<<<1, 1>>>(device_camera, focus_point_d, scene, nSpheres);
+	return cudaDeviceSynchronize();
+}
+
+
+cudaError_t ray_trace(void *ptr, Camera *device_camera, int sample, Vector3d *buffer_d, curandState *rand_state, const Vector2i &resolution_h, const Vector2i *resolution_d, Sphere **scene, int nSpheres)
+{
+	dim3 block_size;
+	block_size.x = 4;
+	block_size.y = 4;
+
+	dim3 grid_size;
+	grid_size.x = resolution_h.x() / block_size.x;
+	grid_size.y = resolution_h.y() / block_size.y;
+
+	raytrace_kernel<<<grid_size, block_size>>>(static_cast<int*>(ptr), device_camera, 3, sample, buffer_d, rand_state, resolution_d, scene, nSpheres);
+
+	return cudaDeviceSynchronize();
+}
+
+__global__ void init_curand_kernel(curandState *state, unsigned long *seed, const Vector2i *resolution)
+{
+	int index_x = blockIdx.x * blockDim.x + threadIdx.x;
+	int index_y = blockIdx.y * blockDim.y + threadIdx.y;
+
+	curand_init(seed[index_y * resolution->x() + index_x], 0, 0, &state[index_y * resolution->x() + index_x]);
+}
+
+cudaError_t init_curand(curandState *rand_state_d, unsigned long *seeds, const Vector2i &resolution_h, const Vector2i *resolution_d)
+{
+		dim3 block_size;
+	block_size.x = 4;
+	block_size.y = 4;
+
+	dim3 grid_size;
+	grid_size.x = resolution_h.x() / block_size.x;
+	grid_size.y = resolution_h.y() / block_size.y;
+
+	init_curand_kernel<<<grid_size, block_size>>>(rand_state_d, seeds, resolution_d);
+
+	return cudaDeviceSynchronize();
+}
+
+__global__ void setup_scene_kernel(Sphere **scene, int *nSpheres)
+{
+	Sphere *spheres = new Sphere[5];
 	spheres[0].radius = 1;
-	spheres[0].position.x() = light_d->x();
-	spheres[0].position.y() = light_d->y();
-	spheres[0].position.z() = light_d->z();
+	spheres[0].position.x() = 0;
+	spheres[0].position.y() = 10;
+	spheres[0].position.z() = 0;
 	spheres[0].diffuse.x() = 1;
 	spheres[0].diffuse.y() = 1;
 	spheres[0].diffuse.z() = 1;
@@ -265,7 +344,7 @@ __global__ void dostuff2(int *ptr, Camera *camera, int depth, Vector3d *light_d,
 	spheres[1].diffuse.y() = 1;
 	spheres[1].diffuse.z() = 1;
 	spheres[1].emissive = Vector3d(0.0, 0.0, 0.0);
-	spheres[1].refl_coeff = 0.0;
+	spheres[1].refl_coeff = 1.0;
 
 	spheres[2].radius = 1.5;
 	spheres[2].position.x() = 0;
@@ -284,8 +363,8 @@ __global__ void dostuff2(int *ptr, Camera *camera, int depth, Vector3d *light_d,
 	spheres[3].diffuse.x() = 1;
 	spheres[3].diffuse.y() = 1;
 	spheres[3].diffuse.z() = 1;
-	spheres[3].emissive = Vector3d(0.0, 0.0, 0.0);
-	spheres[3].refl_coeff = 0.0;
+	spheres[3].emissive = Vector3d(1.0, 1.0, 1.0) * 0.01;
+	spheres[3].refl_coeff = 0.1;
 
 	// Tiny red ball
 	spheres[4].radius = 0.25;
@@ -293,225 +372,18 @@ __global__ void dostuff2(int *ptr, Camera *camera, int depth, Vector3d *light_d,
 	spheres[4].position.y() = 1.5;
 	spheres[4].position.z() = -3.375;
 	spheres[4].diffuse.x() = 1;
-	spheres[4].diffuse.y() = 1;
-	spheres[4].diffuse.z() = 1;
-	spheres[4].emissive = Vector3d(1.0, 0.0, 0.0);
+	spheres[4].diffuse.y() = 0;
+	spheres[4].diffuse.z() = 0;
+	spheres[4].emissive = Vector3d(0.0, 0.0, 0.0);
 	spheres[4].refl_coeff = 0.0;
 
-	ray_trace(ray, spheres, 5, depth, color, rand_state);
-	//ray_trace(camera, depth, color);
-
-	color.clamp(Vector3d(0, 0, 0), Vector3d(1, 1, 1));
-
-	Vector3d &current_color = buffer_d[index_y * (800) + index_x];
-	current_color.multiply(sample);
-	current_color += color;
-	current_color.multiply(1 / (double)(sample + 1));
-	ptr[index_y * 800 + index_x] = 255 << 24 | static_cast<int>(current_color.x() * 255) << 16  | static_cast<int>(current_color.y() * 255) << 8 | static_cast<int>(current_color.z() * 255);
-	//ptr[index_y * 800 + index_x] = 0xFF0000FF;
-
-	//float r = ptr[index_y * (800) + index_x];
-	//float g = ptr[index_y * (800) + index_x + 1];
-	//float b = ptr[index_y * (800) + index_x + 2];
-	//
-	//r *= sample;
-	//g *= sample;
-	//b *= sample;
-
-	//r += color.x();
-	//g += color.y();
-	//b += color.z();
-
-	//r /= sample + 1;
-	//g /= sample + 1;
-	//b /= sample + 1;
-
-	/*int buffer_color = ptr[index_y * 800 + index_x];
-	int r = (buffer_color & 0x00FF0000) >> 16;
-	int g = (buffer_color & 0x0000FF00) >> 8;
-	int b = (buffer_color & 0x000000FF0);
-	
-	r *= sample;
-	g *= sample;
-	b *= sample;
-
-	r += static_cast<int>(color.x() * 255);
-	g += static_cast<int>(color.y() * 255);
-	b += static_cast<int>(color.z() * 255);
-
-	r /= sample + 1;
-	g /= sample + 1;
-	b /= sample + 1;
-
-	if(r > 255)
-		r = 255;
-	else if(r < 0)
-		r = 0;
-	if(g > 255)
-		g = 255;
-	else if(g < 0)
-		g = 0;
-	if(b > 255)
-		b = 255;
-	else if(b < 0)
-		b = 0;
-
-	
-	ptr[index_y * 800 + index_x] = 255 << 24 | r << 16  | g << 8 | b;*/
-	//ptr[index_y * 800 + index_x] = 255 << 24 | static_cast<int>(color.x() * 255) << 16  | static_cast<int>(color.y() * 255) << 8 | static_cast<int>(color.z() * 255);
+	*scene = spheres;
+	*nSpheres = 5;
 }
 
-__global__ void dostuffKernel(int *ptr, Camera *camera, int seed, int depth)
+cudaError_t setup_scene(Sphere **spheres, int *nSpheres)
 {
-    int index_x = blockIdx.x * blockDim.x + threadIdx.x;
-	int index_y = blockIdx.y * blockDim.y + threadIdx.y;
-
-	StaticUniformHeap<Ray, 20> heap;
-
-	Vector3d color;
-	
-	Sphere s;
-	s.radius = 10;
-	s.position.x() = 0;
-	s.position.y() = 0;
-	s.position.z() = -50;
-	s.diffuse.x() = s.diffuse.y() = s.diffuse.z() = 1;
-	s.emissive = Vector3d(0.1, 0.1, 0.1);
-	s.refl_coeff = 1;
-
-	
-	Ray *ray = heap.allocate();
-	camera->cast_ray(ray, index_x, index_y);
-	
-	{
-		StaticStack<Ray*, 20> rays;
-
-		rays.push(ray);
-		while(!rays.empty())
-		{
-			Ray* current_ray = rays.pop();
-
-			if(current_ray->depth_ < depth)
-			{
-				if(intersect(current_ray, s))
-				{
-					color += s.emissive;
-
-					if(!s.diffuse.is_zero())
-					{
-	//					// Loopa över alla andra emissive objects och utför ljusberäkning
-					}
-
-					if(s.refl_coeff)
-					{
-						Ray *refl_ray = heap.allocate();
-						current_ray->reflected = refl_ray;
-						
-						//refl_ray->depth_ = 50;
-						//int dephtesku = current_ray->depth_ + 1;
-						//refl_ray->depth_ = current_ray->depth_ + 1;
-
-						//refl_ray->origin_ = current_ray->intersection.coordinate;
-	//					refl_ray->direction_ = current_ray->direction_ - current_ray->intersection.surface_normal * 2.0 * current_ray->direction_.dot(current_ray->intersection.surface_normal);
-	//					refl_ray->direction_.normalize();
-	//					current_ray->reflected = refl_ray;
-	//					rays.push(refl_ray);
-					}
-				}
-			}
-		}
-	}
-
-	//delete ray;
-
-	/*Stack<Ray*> to_examine(10);
-	Stack<Ray*> to_traverse(10);
-
-	to_examine.push(&ray);*/
-
-	/*while(!to_examine.empty())
-	{
-		Ray *ray = to_examine.pop();
-		
-		if(ray->reflected != nullptr)
-		{
-			to_examine.push(ray->reflected);
-			to_traverse.push(ray->reflected);
-		}
-	}*/
-	
-	//else if(intersect(ray, s2))
-	//{
-		//b = 255;
-	//}
-
-	ptr[index_y * 800 + index_x] = 255 << 24 | static_cast<int>(color.x() * 255) << 16  | static_cast<int>(color.y() * 255) << 8 | static_cast<int>(color.z() * 255);
-
-	
-
-}
-
-cudaError_t dostuff(void *ptr, Camera *device_camera, int seed, Vector3d *light_d, int sample, Vector3d *buffer_d, curandState *rand_state)
-{
-	dim3 block_size;
-	block_size.x = 4;
-	block_size.y = 4;
-
-	dim3 grid_size;
-	grid_size.x = 800 / block_size.x;
-	grid_size.y = 600 / block_size.y;
-
-		
-
-	//dostuffKernel<<<grid_size, block_size>>>(static_cast<int*>(ptr), device_camera, 0, 1);
-	dostuff2<<<grid_size, block_size>>>(static_cast<int*>(ptr), device_camera, 2, light_d, sample, buffer_d, rand_state);
-	//dostuffKernel<<<grid_size, block_size>>>(static_cast<int*>(ptr), device_camera, seed, 4);
-
-	return cudaDeviceSynchronize();
-}
-
-__global__ void clearBufferKernel(Vector3d *ptr)
-{
-	int index_x = blockIdx.x * blockDim.x + threadIdx.x;
-	int index_y = blockIdx.y * blockDim.y + threadIdx.y;
-	Vector3d &color = ptr[index_y * (800) + index_x];
-	color.x() = color.y() = color.z() = 0;
-}
-
-__global__ void init_curand_kernel(curandState *state, unsigned long *seed)
-{
-	int index_x = blockIdx.x * blockDim.x + threadIdx.x;
-	int index_y = blockIdx.y * blockDim.y + threadIdx.y;
-
-	curand_init(seed[index_y * 800 + index_x], 0, 0, &state[index_y * 800 + index_x]);
-}
-
-cudaError_t clearBuffer(Vector3d *ptr)
-{
-	dim3 block_size;
-	block_size.x = 4;
-	block_size.y = 4;
-
-	dim3 grid_size;
-	grid_size.x = 800 / block_size.x;
-	grid_size.y = 600 / block_size.y;
-
-	clearBufferKernel<<<grid_size, block_size>>>(ptr);
-
-	return cudaDeviceSynchronize();
-}
-
-cudaError_t init_curand(curandState *rand_state_d, unsigned long *seeds)
-{
-		dim3 block_size;
-	block_size.x = 4;
-	block_size.y = 4;
-
-	dim3 grid_size;
-	grid_size.x = 800 / block_size.x;
-	grid_size.y = 600 / block_size.y;
-
-	init_curand_kernel<<<grid_size, block_size>>>(rand_state_d, seeds);
+	setup_scene_kernel<<<1, 1>>>(spheres, nSpheres);
 
 	return cudaDeviceSynchronize();
 }

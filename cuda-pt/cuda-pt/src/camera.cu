@@ -1,15 +1,14 @@
 #include "camera.h"
 #include "vector2.h"
-#include "mtrand.h"
 #include "ray.h"
 
-void Camera::CalculateN()
+void Camera::calculate_n()
 {
 	n_ = direction_ * -1;
 	n_.normalize();
 }
 
-void Camera::CalculateUV()
+void Camera::calculate_uv()
 {
 	u_ = up_.cross(n_);
 	u_.normalize();
@@ -25,8 +24,8 @@ void Camera::update() {
 	image_plane_height_ = 2 * distance * tan(fov_ / 2.0);
 	image_plane_width_ = image_plane_height_ * aspect_ratio_;
 
-	CalculateN();
-	CalculateUV();
+	calculate_n();
+	calculate_uv();
 
 	Vector3d image_plane_center = position_ - n_ * distance;
 

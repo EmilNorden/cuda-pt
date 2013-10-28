@@ -5,11 +5,11 @@
 #include <stdio.h>
 #include <stack>
 
-#include "src/Sphere.h"
+#include "Sphere.h"
 
-#include "src/camera.h"
+#include "camera.h"
 
-#include "src/intersectioninfo.h"
+#include "intersectioninfo.h"
 
 #include <curand_kernel.h>
 
@@ -288,14 +288,14 @@ cudaError_t focus_camera(Camera *device_camera, const Vector2i *focus_point_d, S
 cudaError_t ray_trace(void *ptr, Camera *device_camera, int sample, Vector3d *buffer_d, curandState *rand_state, const Vector2i &resolution_h, const Vector2i *resolution_d, Sphere **scene, int nSpheres)
 {
 	dim3 block_size;
-	block_size.x = 4;
-	block_size.y = 4;
+	block_size.x = 8;
+	block_size.y = 8;
 
 	dim3 grid_size;
 	grid_size.x = resolution_h.x() / block_size.x;
 	grid_size.y = resolution_h.y() / block_size.y;
 
-	raytrace_kernel<<<grid_size, block_size>>>(static_cast<int*>(ptr), device_camera, 3, sample, buffer_d, rand_state, resolution_d, scene, nSpheres);
+	raytrace_kernel<<<grid_size, block_size>>>(static_cast<int*>(ptr), device_camera, 4, sample, buffer_d, rand_state, resolution_d, scene, nSpheres);
 
 	return cudaDeviceSynchronize();
 }
@@ -325,60 +325,48 @@ cudaError_t init_curand(curandState *rand_state_d, unsigned long *seeds, const V
 
 __global__ void setup_scene_kernel(Sphere **scene, int *nSpheres)
 {
-	Sphere *spheres = new Sphere[5];
-	spheres[0].radius = 1;
+	Sphere *spheres = new Sphere[8];
+
+	spheres[0].radius = 400;
 	spheres[0].position.x() = 0;
-	spheres[0].position.y() = 10;
+	spheres[0].position.y() = -400;
 	spheres[0].position.z() = 0;
-	spheres[0].diffuse.x() = 1;
+	spheres[0].diffuse.x() = 0.5;
 	spheres[0].diffuse.y() = 1;
-	spheres[0].diffuse.z() = 1;
-	spheres[0].emissive = Vector3d(0.4, 0.4, 0.4) * 200;
-	spheres[0].refl_coeff = 0;
+	spheres[0].diffuse.z() = 0.5;
+	spheres[0].emissive = Vector3d(1.0, 1.0, 1.0) * 0.00;
+	spheres[0].refl_coeff = 0.00;
 
-	spheres[1].radius = 1.5;
-	spheres[1].position.x() = -4;
+	spheres[1].radius = 0.5;
+	spheres[1].position.x() = 0;
 	spheres[1].position.y() = 1.5;
-	spheres[1].position.z() = -5;
+	spheres[1].position.z() = 0;
 	spheres[1].diffuse.x() = 1;
-	spheres[1].diffuse.y() = 1;
-	spheres[1].diffuse.z() = 1;
-	spheres[1].emissive = Vector3d(0.0, 0.0, 0.0);
-	spheres[1].refl_coeff = 1.0;
+	spheres[1].diffuse.y() = 0;
+	spheres[1].diffuse.z() = 0;
+	spheres[1].emissive = Vector3d(1.0, 0.5, 0.5) * 15;
+	spheres[1].refl_coeff = 0.0;
 
-	spheres[2].radius = 1.5;
-	spheres[2].position.x() = 0;
-	spheres[2].position.y() = 1.5;
-	spheres[2].position.z() = 5;
-	spheres[2].diffuse.x() = 1;
-	spheres[2].diffuse.y() = 0;
-	spheres[2].diffuse.z() = 0;
-	spheres[2].emissive = Vector3d(0.0, 0.0, 0.0);
-	spheres[2].refl_coeff = 0.25;
+	double angle_step = (3.14159265359 * 2) / 4.0;
+	for(int i = 2; i < 6; ++i)
+	{
+		double angle = angle_step * (i-2);
+		double x = sin(angle) * 3;
+		double z = cos(angle) * 3;
 
-	spheres[3].radius = 400;
-	spheres[3].position.x() = 0;
-	spheres[3].position.y() = -400;
-	spheres[3].position.z() = 0;
-	spheres[3].diffuse.x() = 1;
-	spheres[3].diffuse.y() = 1;
-	spheres[3].diffuse.z() = 1;
-	spheres[3].emissive = Vector3d(1.0, 1.0, 1.0) * 0.01;
-	spheres[3].refl_coeff = 0.1;
-
-	// Tiny red ball
-	spheres[4].radius = 0.25;
-	spheres[4].position.x() = -4;
-	spheres[4].position.y() = 1.5;
-	spheres[4].position.z() = -3.375;
-	spheres[4].diffuse.x() = 1;
-	spheres[4].diffuse.y() = 0;
-	spheres[4].diffuse.z() = 0;
-	spheres[4].emissive = Vector3d(0.0, 0.0, 0.0);
-	spheres[4].refl_coeff = 0.0;
+		spheres[i].radius = 1.5;
+		spheres[i].position.x() = x;
+		spheres[i].position.y() = 1.5;
+		spheres[i].position.z() = z;
+		spheres[i].diffuse.x() = 1;
+		spheres[i].diffuse.y() = 1;
+		spheres[i].diffuse.z() = 1;
+		spheres[i].emissive = Vector3d(0.0, 0.0, 0.0);
+		spheres[i].refl_coeff = 0.75;
+	}
 
 	*scene = spheres;
-	*nSpheres = 5;
+	*nSpheres = 6;
 }
 
 cudaError_t setup_scene(Sphere **spheres, int *nSpheres)

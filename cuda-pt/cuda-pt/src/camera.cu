@@ -55,8 +55,8 @@ __device__ void Camera::cast_perturbed_ray(Ray &ray, int x, int y, double radius
 
 	Vector3d focus_point = position_ + ray.direction_ * focal_length_;
 
-	double u_shift = curand_uniform(&rand_state); //(((double)mt_rand() - min) / range); //(MathUtil::get_rand()  * radius) - (radius / 2.0);
-	double v_shift = curand_uniform(&rand_state); //(((double)mt_rand() - min) / range); //(MathUtil::get_rand()  * radius) - (radius / 2.0);
+	double u_shift = curand_uniform(&rand_state);
+	double v_shift = curand_uniform(&rand_state); 
 
 	double r = radius;
 

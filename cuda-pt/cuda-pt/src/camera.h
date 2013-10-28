@@ -9,8 +9,6 @@
 #include <exception>
 #include <random>
 
-class MTRand;
-
 class Camera
 {
 private:

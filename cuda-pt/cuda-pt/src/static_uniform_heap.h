@@ -1,7 +1,7 @@
 #ifndef STATIC_UNIFORM_HEAP_H_
 #define STATIC_UNIFORM_HEAP_H_
 
-#include "cuda_helpers.h"
+#include "error_assertion.h"
 
 // A simple static (ie will not grow dynamically) heap that can only contain a single type of object.
 template <typename T, size_t Capacity>

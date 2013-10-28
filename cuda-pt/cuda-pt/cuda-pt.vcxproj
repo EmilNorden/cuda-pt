@@ -75,8 +75,8 @@
     <LinkIncremental>true</LinkIncremental>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <LibraryPath>D:\Projects\sdl2\lib\x86;$(SolutionDir)\libs\x86;$(LibraryPath)</LibraryPath>
-    <IncludePath>D:\Projects\sdl2\include;$(SolutionDir)\inc;$(IncludePath)</IncludePath>
+    <LibraryPath>$(SDL2_DIR)\lib\x86;$(SolutionDir)\libs\x86;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(SDL2_DIR)\include;$(SolutionDir)\inc;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -87,7 +87,7 @@
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
-      <AdditionalDependencies>cudart.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;sdl2.lib;sdl2main.lib;glew32.lib;opengl32.lib;odbccp32.lib;cublas.lib;cuda.lib;curand.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>cudart.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;sdl2.lib;sdl2main.lib;glew32.lib;opengl32.lib;odbccp32.lib;cublas.lib;cuda.lib;curand.lib;SDL2_ttf.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>echo copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"
@@ -119,7 +119,7 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -130,7 +130,7 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <SubSystem>Console</SubSystem>
-      <AdditionalDependencies>cudart.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;sdl2.lib;sdl2main.lib;glew32.lib;opengl32.lib;cublas.lib;cuda.lib;curand.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>cudart.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;sdl2.lib;sdl2main.lib;glew32.lib;opengl32.lib;cublas.lib;cuda.lib;curand.lib;SDL2_ttf.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>echo copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"
@@ -162,21 +162,23 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <CudaCompile Include="kernel.cu" />
-  </ItemGroup>
-  <ItemGroup>
     <CudaCompile Include="src\camera.cu">
       <FileType>Document</FileType>
     </CudaCompile>
-    <ClCompile Include="src\cuda_helpers.cpp" />
+    <ClCompile Include="src\error_assertion.cpp" />
+    <ClCompile Include="src\font.cpp" />
     <ClCompile Include="src\main.cpp" />
+    <CudaCompile Include="src\kernel.cu" />
     <CudaCompile Include="src\stack.cu" />
     <ClCompile Include="src\mouse_device.cpp" />
+    <ClCompile Include="src\texture.cpp" />
     <ClCompile Include="src\window.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\camera.h" />
     <ClInclude Include="src\error_assertion.h" />
+    <ClInclude Include="src\font.h" />
+    <ClInclude Include="src\SDL_ttf.h" />
     <ClInclude Include="src\shared_device_pointer.h" />
     <ClInclude Include="src\sphere.h" />
     <ClInclude Include="src\gametime.h" />
@@ -186,6 +188,7 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
     <ClInclude Include="src\stack.h" />
     <ClInclude Include="src\static_uniform_heap.h" />
     <ClInclude Include="src\static_stack.h" />
+    <ClInclude Include="src\texture.h" />
     <ClInclude Include="src\vector2.h" />
     <ClInclude Include="src\vector3.h" />
     <ClInclude Include="src\window.h" />

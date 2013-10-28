@@ -8,7 +8,6 @@
 template <typename T>
 void FreeDeviceMemory(T* ptr)
 {
-	std::cout << "FreeDeviceMemory called on address" << std::hex << "0x" << ptr << "\n" << std::dec;
 	if(ptr != nullptr)
 	{
 		cudaFree(ptr);

@@ -1,11 +1,13 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <CudaCompile Include="kernel.cu" />
     <CudaCompile Include="src\camera.cu">
       <Filter>Source Files</Filter>
     </CudaCompile>
     <CudaCompile Include="src\stack.cu">
+      <Filter>Source Files</Filter>
+    </CudaCompile>
+    <CudaCompile Include="src\kernel.cu">
       <Filter>Source Files</Filter>
     </CudaCompile>
   </ItemGroup>
@@ -24,10 +26,16 @@
     <ClCompile Include="src\window.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\cuda_helpers.cpp">
+    <ClCompile Include="src\mouse_device.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\mouse_device.cpp">
+    <ClCompile Include="src\font.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\texture.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\error_assertion.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -72,6 +80,15 @@
       <Filter>Header files</Filter>
     </ClInclude>
     <ClInclude Include="src\sphere.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\SDL_ttf.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\font.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\texture.h">
       <Filter>Header files</Filter>
     </ClInclude>
   </ItemGroup>

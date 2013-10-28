@@ -7,16 +7,5 @@ public:
 	Vector3d coordinate;
 	Vector3d surface_normal;
 	double distance;
-
-	//IntersectionInfo()
-	//{
-	//}
-
-	//IntersectionInfo(const IntersectionInfo &other)
-	//{
-	//	coordinate = other.coordinate;
-	//	surface_normal = other.surface_normal;
-	//	distance = other.distance;
-	//}
 };
 #endif

@@ -1,8 +1,8 @@
 #include <GL/glew.h>
 #include "sdl.h"
-#include "SDL_syswm.h"
+#include "SDL_ttf.h"
 #include "window.h"
-//
+
 #include "error_assertion.h"
 #include <cuda_runtime.h>
 #include <cuda.h>
@@ -11,12 +11,16 @@
 #include "stack.h"
 
 #include <iostream>
+#include <chrono>
+#include <random>
 
 #include "sphere.h"
 #include "camera.h"
 #include "gametime.h"
 #include "mouse_device.h"
 #include "shared_device_pointer.h"
+#include "font.h"
+#include "texture.h"
 
 cudaError_t setup_scene(Sphere **scene, int *nSpheres);
 cudaError_t focus_camera(Camera *device_camera, const Vector2i *focus_point_d, Sphere **scene, int nSpheres);
@@ -28,8 +32,12 @@ cudaError_t init_curand(curandState *rand_state_d, unsigned long *seeds, const V
 
 #define RESOLUTION_WIDTH	1280
 #define RESOLUTION_HEIGHT	720
+//#define RESOLUTION_WIDTH	800
+//#define RESOLUTION_HEIGHT	600
 
 Vector2i resolution_h(RESOLUTION_WIDTH, RESOLUTION_HEIGHT);
+
+TTF_Font	*font;
 
 GLuint	bufferID;
 GLuint	textureID;
@@ -42,6 +50,7 @@ curandState *rand_state_d;
 Vector2i	*resolution_d;
 Vector2i	*focus_point_d;
 Sphere		**scene_d;
+
 
 SDL_GLContext init_gl(SDLWindow &window)
 {
@@ -57,7 +66,7 @@ SDL_GLContext init_gl(SDLWindow &window)
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
-	glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+	glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
 
 	GL_CALL(glGetError());
 
@@ -69,6 +78,9 @@ SDL_GLContext init_gl(SDLWindow &window)
 	glBufferData(GL_PIXEL_UNPACK_BUFFER, RESOLUTION_WIDTH * RESOLUTION_HEIGHT * 4 * 4, 
 		NULL, GL_DYNAMIC_COPY);
 
+	// Enable alpha blend
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
 	// Enable Texturing
 	glEnable(GL_TEXTURE_2D);
 	// Generate a texture ID
@@ -80,8 +92,8 @@ SDL_GLContext init_gl(SDLWindow &window)
 	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA8, RESOLUTION_WIDTH, RESOLUTION_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 	
 	// Must set the filter mode, GL_LINEAR enables interpolation when scaling 
-	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	GL_CALL(glGetError());
 
 	return context;
@@ -112,11 +124,17 @@ void init_cuda()
 void init_curand()
 {
 	CUDA_CALL(cudaMalloc(&rand_state_d, sizeof(curandState) * RESOLUTION_WIDTH * RESOLUTION_HEIGHT));
-	unsigned long *seeds_h = new unsigned long[RESOLUTION_WIDTH * RESOLUTION_HEIGHT];
+	
 	unsigned long *seeds_d;
+
+	// Randomly generate seeds for the kernels curand states.
+	unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+	std::minstd_rand0 generator (seed);
+
+	unsigned long *seeds_h = new unsigned long[RESOLUTION_WIDTH * RESOLUTION_HEIGHT];
 	for(int i = 0; i < RESOLUTION_WIDTH * RESOLUTION_HEIGHT; ++i)
 	{
-		seeds_h[i] = SDL_GetTicks() + i;
+		seeds_h[i] = generator();
 	}
 
 	CUDA_CALL(cudaMalloc(&seeds_d, sizeof(unsigned long) * RESOLUTION_WIDTH * RESOLUTION_HEIGHT));
@@ -137,10 +155,21 @@ void init_scene()
 	CUDA_CALL(cudaFree(nSpheres_d));
 }
 
+std::shared_ptr<Texture> RenderText(std::string message, SDLFont &font, 
+                        SDL_Color color)
+{
+    SDL_Surface *surf = TTF_RenderText_Blended(font.get(), message.c_str(), color);
+	std::shared_ptr<Texture> tex(new Texture(surf));
+	SDL_FreeSurface(surf);
+
+	return tex;
+}
+
 int main(int argc, char **argv)
 {
 	std::cout << "Initializing SDL\n";
 	SDL_Init(SDL_INIT_EVERYTHING);
+	TTF_Init();
 	SDLWindow window(SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, RESOLUTION_WIDTH, RESOLUTION_HEIGHT, false, "CUDA Pathtracing");
 
 	std::cout << "Initializing OpenGL...\n";
@@ -149,9 +178,13 @@ int main(int argc, char **argv)
 	std::cout << "Initializing CUDA...\n";
 	init_cuda();
 
+	std::cout << "Initializing curand...\n";
+	/* Set up CURAND */
+	
+	init_curand();
+
 	std::cout << "Initializing scene...\n";
 	init_scene();
-
 	// Camera setup
 	Vector3d cam_pos(0, 5, 20);
 	Vector3d cam_target = Vector3d(0, 0, 0) - cam_pos;
@@ -161,10 +194,7 @@ int main(int argc, char **argv)
 	double focal_length = (focus_point - cam_pos).length();
 	Camera camera_h(cam_pos, cam_target, Vector3d(0, 1, 0), PI / 4.0, (double)RESOLUTION_WIDTH / RESOLUTION_HEIGHT, Vector2i(RESOLUTION_WIDTH, RESOLUTION_HEIGHT), focal_length);
 
-	std::cout << "Initializing curand...\n";
-	/* Set up CURAND */
 	
-	init_curand();
 	
 	void *pixel_buffer_object_d;
 	MouseDevice mouse;
@@ -181,11 +211,12 @@ int main(int argc, char **argv)
 	
 	CUDA_CALL(cudaMalloc(&focus_point_d, sizeof(Vector2i)));
 
+	uint32_t sample_start_time = timer.realTime();
 	std::cout << "Done! Entering render loop\n";
 	while(running)
 	{
 		mouse.frame_update();
-		timer.frameUpdate(SDL_GetTicks());
+		timer.frame_update(SDL_GetTicks());
 
 		SDL_Event e;
 		while(SDL_PollEvent(&e))
@@ -208,6 +239,12 @@ int main(int argc, char **argv)
 		if(data[SDL_SCANCODE_ESCAPE])
 		{
 			running = false;
+		}
+		if(data[SDL_SCANCODE_TAB])
+		{
+			double duration = (timer.realTime() - sample_start_time) / 1000.0f;
+			uint32_t rendered_data = (RESOLUTION_WIDTH * RESOLUTION_HEIGHT * 4 * sample) / duration;
+			std::cout << "Current sample count: " << sample << ". Render bandwidth: " << rendered_data / (1024*1024) << " Mb/s\n";
 		}
 
 		if(mouse.left_button() & Pressed && mouse.left_button() & ChangedThisFrame)
@@ -243,7 +280,7 @@ int main(int argc, char **argv)
 			// that the pixex buffer object is completely overwritten with new data
 			frame_changed = false;
 			sample = 0;
-
+			sample_start_time = timer.realTime();
 			camera_h.update();
 			CUDA_CALL(cudaMemcpy(camera_d, &camera_h, sizeof(Camera), cudaMemcpyHostToDevice));
 		}
@@ -257,7 +294,7 @@ int main(int argc, char **argv)
 			double normalized_x = mouse_x / (double)window_size.x();
 			double normalized_y = 1 - (mouse_y / (double)window_size.y());
 
-			Vector2i focus_point(RESOLUTION_WIDTH * normalized_x, RESOLUTION_HEIGHT * normalized_y);
+			Vector2i focus_point(static_cast<int>(RESOLUTION_WIDTH * normalized_x), static_cast<int>(RESOLUTION_HEIGHT * normalized_y));
 			CUDA_CALL(cudaMemcpy(focus_point_d, &focus_point, sizeof(Vector2i), cudaMemcpyHostToDevice));
 
 			focus_camera(camera_d, focus_point_d, scene_d, nSpheres);	
@@ -287,6 +324,22 @@ int main(int argc, char **argv)
 			glTexCoord2f(1.0f, 0.0f);
 			glVertex3f(1.0f,0,0);
 		glEnd();
+
+		/*glBindTexture( GL_TEXTURE_2D, texture->glTexture() );
+
+		glBegin(GL_QUADS);
+			glTexCoord2f(0.0f, 0.0f); 
+			glVertex3f(0,0,0);
+
+			glTexCoord2f(0,1.0f);
+			glVertex3f(0,1.0f,0);
+
+			glTexCoord2f(1.0f, 1.0f);
+			glVertex3f(1.0f,1.0f,0);
+
+			glTexCoord2f(1.0f, 0.0f);
+			glVertex3f(1.0f,0,0);
+		glEnd();*/
 
 		GL_CALL(glGetError());
 		

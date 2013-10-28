@@ -17,7 +17,7 @@ public:
 	{
 	}
 
-	void frameUpdate(uint32_t real)
+	void frame_update(uint32_t real)
 	{
 		frame_ = real - real_;
 		real_ = real;

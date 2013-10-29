@@ -21,6 +21,7 @@
 #include "shared_device_pointer.h"
 #include "font.h"
 #include "texture.h"
+#include "cmd_args.h"
 
 cudaError_t setup_scene(Sphere **scene, int *nSpheres);
 cudaError_t focus_camera(Camera *device_camera, const Vector2i *focus_point_d, Sphere **scene, int nSpheres);
@@ -99,8 +100,43 @@ SDL_GLContext init_gl(SDLWindow &window)
 	return context;
 }
 
+void print_device_properties(const cudaDeviceProp &prop)
+{
+	std::cout << "Name:\t\t\t" << prop.name << "\n";
+	std::cout << "Compute Capability:\t" << prop.major << "." << prop.minor << "\n";
+	std::cout << "Global memory:\t\t" << prop.totalGlobalMem / (1024.0 * 1024.0) << "Mb\n";
+	std::cout << "Clockrate:\t\t" << prop.clockRate << "\n";
+	std::cout << "Memory clockrate:\t" << prop.memoryClockRate << "\n";
+}
+
+void choose_cuda_device()
+{
+	int device_count;
+	CUDA_CALL(cudaGetDeviceCount(&device_count));
+	
+	if(device_count == 0)
+	{
+		std::cout << "No CUDA capable devices found!\n";
+		exit(EXIT_FAILURE);
+	}
+
+	std::cout << "======\n";
+	std::cout << "Found " << device_count << " CUDA capable devices\n";
+
+	int device_id = 0;
+
+	std::cout << "Choosing device " << device_id << ":\n";
+	cudaSetDevice(device_id);
+	cudaDeviceProp device_prop;
+	CUDA_CALL(cudaGetDeviceProperties(&device_prop, device_id));
+	print_device_properties(device_prop);
+	std::cout << "======\n";
+}
+
 void init_cuda()
 {
+	choose_cuda_device();
+
 	CUDA_CALL(cudaGLSetGLDevice(0))
 	CUDA_CALL(cudaGLRegisterBufferObject(bufferID))
 
@@ -108,9 +144,9 @@ void init_cuda()
 	std::cout << "Setting CUDA Data stack size...\n";
 	size_t stack_size;
 	CUDA_DRIVER_CALL(cuCtxGetLimit(&stack_size, CU_LIMIT_STACK_SIZE))
-	stack_size *= 10;
+	stack_size *= 3;
 	CUDA_DRIVER_CALL(cuCtxSetLimit(CU_LIMIT_STACK_SIZE, stack_size));
-	std::cout << "Successfully set CUDA Data stack size to " << stack_size << "\n";
+	std::cout << "Successfully set CUDA Data stack size to " << stack_size << " bytes\n";
 
 	CUDA_CALL(cudaMalloc(&camera_d, sizeof(Camera)));
 
@@ -167,6 +203,7 @@ std::shared_ptr<Texture> RenderText(std::string message, SDLFont &font,
 
 int main(int argc, char **argv)
 {
+	CmdArgs args(argc, argv);
 	std::cout << "Initializing SDL\n";
 	SDL_Init(SDL_INIT_EVERYTHING);
 	TTF_Init();
@@ -217,7 +254,7 @@ int main(int argc, char **argv)
 	{
 		mouse.frame_update();
 		timer.frame_update(SDL_GetTicks());
-
+		std::cout << timer.frameTime() << "ms\n";
 		SDL_Event e;
 		while(SDL_PollEvent(&e))
 		{

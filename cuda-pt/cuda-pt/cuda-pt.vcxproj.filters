@@ -38,6 +38,9 @@
     <ClCompile Include="src\error_assertion.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\cmd_args.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\window.h">
@@ -89,6 +92,9 @@
       <Filter>Header files</Filter>
     </ClInclude>
     <ClInclude Include="src\texture.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\cmd_args.h">
       <Filter>Header files</Filter>
     </ClInclude>
   </ItemGroup>

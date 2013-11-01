@@ -18,6 +18,7 @@ private:
 	Vector3d n_;
 	Vector3d u_;
 	Vector3d v_;
+	bool updated_this_frame_;
 
 	double fov_;
 	double aspect_ratio_;
@@ -33,6 +34,8 @@ private:
 
 	void calculate_n();
 	void calculate_uv();
+
+	
 public:
 
 	Camera(const Vector3d &pos, const Vector3d &dir, const Vector3d &up, const double fov, const double aspect_ratio, const Vector2i &resolution, double focal_length)
@@ -66,12 +69,18 @@ public:
 		focal_length_ = value;
 	}
 
+	bool updated_this_frame() const {
+		return updated_this_frame_;
+	}
+
 	CUDA_CALLABLE void cast_ray(Ray &ray, int x, int y) const;
 	CUDA_CALLABLE void cast_ray(Ray *ray, int x, int y) const;
 
 	__device__ void cast_perturbed_ray(Ray &ray, int x, int y, double radius, curandState &rand_state) const;
 
 	void update();
+
+	void reset_update_flag();
 };
 
 #endif

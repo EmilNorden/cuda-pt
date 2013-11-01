@@ -10,6 +10,9 @@
     <CudaCompile Include="src\kernel.cu">
       <Filter>Source Files</Filter>
     </CudaCompile>
+    <CudaCompile Include="src\cuda_raytracer.cu">
+      <Filter>Source Files</Filter>
+    </CudaCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Header files">
@@ -39,6 +42,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\cmd_args.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\opengl_surface.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -95,6 +101,12 @@
       <Filter>Header files</Filter>
     </ClInclude>
     <ClInclude Include="src\cmd_args.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\opengl_surface.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\cuda_raytracer.h">
       <Filter>Header files</Filter>
     </ClInclude>
   </ItemGroup>

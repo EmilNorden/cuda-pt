@@ -35,6 +35,10 @@ public:
 		return v_[1];
 	}
 
+	CUDA_CALLABLE bool operator!=(const Vector2 &other) const {
+		return v_[0] != other.v_[0] || v_[1] != other.v_[1] || v_[2] != other.v_[2];
+	}
+
 	Vector2 operator-(const Vector2 &other) const {
 		return Vector2(v_[0] - other.v_[0], v_[1] - other.v_[1]);
 	}

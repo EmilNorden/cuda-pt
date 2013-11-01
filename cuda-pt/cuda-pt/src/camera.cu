@@ -33,6 +33,7 @@ void Camera::update() {
 
 	pixel_width_ = image_plane_width_ / resolution_.x();
 	pixel_height_ = image_plane_height_ / resolution_.y();
+	updated_this_frame_ = true;
 }
 
 void Camera::cast_ray(Ray *ray, int x, int y) const {
@@ -63,4 +64,9 @@ __device__ void Camera::cast_perturbed_ray(Ray &ray, int x, int y, double radius
 	ray.origin_ = position_ - (u_ * (r/2)) - (v_ * (r/2)) + (u_ * r * u_shift) + (v_ * r * v_shift);
 	ray.direction_ = focus_point - ray.origin_;
 	ray.direction_.normalize();
+}
+
+void Camera::reset_update_flag()
+{
+	updated_this_frame_ = false;
 }

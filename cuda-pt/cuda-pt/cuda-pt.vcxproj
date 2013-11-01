@@ -169,17 +169,21 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
     <ClCompile Include="src\error_assertion.cpp" />
     <ClCompile Include="src\font.cpp" />
     <ClCompile Include="src\main.cpp" />
+    <CudaCompile Include="src\cuda_raytracer.cu" />
     <CudaCompile Include="src\kernel.cu" />
     <CudaCompile Include="src\stack.cu" />
     <ClCompile Include="src\mouse_device.cpp" />
+    <ClCompile Include="src\opengl_surface.cpp" />
     <ClCompile Include="src\texture.cpp" />
     <ClCompile Include="src\window.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\camera.h" />
     <ClInclude Include="src\cmd_args.h" />
+    <ClInclude Include="src\cuda_raytracer.h" />
     <ClInclude Include="src\error_assertion.h" />
     <ClInclude Include="src\font.h" />
+    <ClInclude Include="src\opengl_surface.h" />
     <ClInclude Include="src\SDL_ttf.h" />
     <ClInclude Include="src\shared_device_pointer.h" />
     <ClInclude Include="src\sphere.h" />

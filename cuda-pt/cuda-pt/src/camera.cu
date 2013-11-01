@@ -2,6 +2,8 @@
 #include "vector2.h"
 #include "ray.h"
 
+#define PI 3.14159265359
+
 void Camera::calculate_n()
 {
 	n_ = direction_ * -1;
@@ -56,14 +58,22 @@ __device__ void Camera::cast_perturbed_ray(Ray &ray, int x, int y, double radius
 
 	Vector3d focus_point = position_ + ray.direction_ * focal_length_;
 
-	double u_shift = curand_uniform(&rand_state);
+	double angle = curand_uniform(&rand_state) * PI * 2;
+	double length = curand_uniform(&rand_state) * radius;
+
+	ray.origin_ = position_ + (u_ * sin(angle) * length) + (v_ * cos(angle) * length);
+	ray.direction_ = focus_point - ray.origin_;
+	ray.direction_.normalize();
+
+	// This created a rectangular blur
+	/*double u_shift = curand_uniform(&rand_state);
 	double v_shift = curand_uniform(&rand_state); 
 
 	double r = radius;
 
 	ray.origin_ = position_ - (u_ * (r/2)) - (v_ * (r/2)) + (u_ * r * u_shift) + (v_ * r * v_shift);
 	ray.direction_ = focus_point - ray.origin_;
-	ray.direction_.normalize();
+	ray.direction_.normalize();*/
 }
 
 void Camera::reset_update_flag()

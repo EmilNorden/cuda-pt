@@ -20,8 +20,8 @@ cudaError_t setup_scene(Sphere **scene, int *nSpheres);
 
 #define PI 3.14159265359
 
-#define RESOLUTION_WIDTH	800
-#define RESOLUTION_HEIGHT	600
+#define RESOLUTION_WIDTH	640
+#define RESOLUTION_HEIGHT	480
 
 TTF_Font *font;
 
@@ -163,7 +163,7 @@ int main(int argc, char **argv)
 	double focal_length = (focus_point - cam_pos).length();
 	Camera camera_h(cam_pos, cam_target, Vector3d(0, 1, 0), PI / 4.0, (double)RESOLUTION_WIDTH / RESOLUTION_HEIGHT, Vector2i(RESOLUTION_WIDTH, RESOLUTION_HEIGHT), focal_length);
 
-	auto surface = OpenGLSurface::create(800, 600);
+	auto surface = OpenGLSurface::create(RESOLUTION_WIDTH, RESOLUTION_HEIGHT);
 	tracer.set_surface(surface);
 	
 	MouseDevice mouse;

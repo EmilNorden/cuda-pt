@@ -11,7 +11,7 @@ OpenGLSurface::OpenGLSurface(size_t width, size_t height)
 {
 	glGenBuffers(1, &buffer_id_); 
 	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, buffer_id_);
-	glBufferData(GL_PIXEL_UNPACK_BUFFER, width * height * 4 * 4, 
+	glBufferData(GL_PIXEL_UNPACK_BUFFER, width * height * 4, 
 		NULL, GL_DYNAMIC_COPY);
 
 	glGenTextures(1, &texture_id_); 

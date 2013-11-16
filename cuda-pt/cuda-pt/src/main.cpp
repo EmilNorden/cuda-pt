@@ -1,4 +1,5 @@
 #include "GL/glew.h"
+#include "GL/wglext.h"
 #include "cuda.h"
 #include "cuda_gl_interop.h"
 #include "sdl.h"
@@ -16,12 +17,14 @@
 
 #include <iostream>
 
+
+
 cudaError_t setup_scene(Sphere **scene, int *nSpheres);
 
 #define PI 3.14159265359
 
-#define RESOLUTION_WIDTH	640
-#define RESOLUTION_HEIGHT	480
+#define RESOLUTION_WIDTH	800
+#define RESOLUTION_HEIGHT	600
 
 TTF_Font *font;
 
@@ -29,6 +32,24 @@ int	nSpheres;
 
 // Device memory pointers
 Sphere		**scene_d;
+
+bool WGLExtensionSupported(const char *extension_name)
+{
+    // this is pointer to function which returns pointer to string with list of all wgl extensions
+    PFNWGLGETEXTENSIONSSTRINGEXTPROC _wglGetExtensionsStringEXT = NULL;
+
+    // determine pointer to wglGetExtensionsStringEXT function
+    _wglGetExtensionsStringEXT = (PFNWGLGETEXTENSIONSSTRINGEXTPROC) wglGetProcAddress("wglGetExtensionsStringEXT");
+
+    if (strstr(_wglGetExtensionsStringEXT(), extension_name) == NULL)
+    {
+        // string was not found
+        return false;
+    }
+
+    // extension is supported
+    return true;
+}
 
 void cleanup_cuda()
 {
@@ -57,6 +78,19 @@ SDL_GLContext init_gl(SDLWindow &window)
 	glEnable(GL_TEXTURE_2D);
  
 	GL_CALL(glGetError());
+
+#ifdef _WIN32
+	if(WGLExtensionSupported("WGL_EXT_swap_control"))
+	{
+		std::cout << "WGL_EXT_swap_control supported. Disabling vsync.\n";
+		PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC) wglGetProcAddress("wglSwapIntervalEXT");
+		wglSwapIntervalEXT(0);
+	}
+	else
+	{
+		std::cout << "WGL_EXT_swap_control not supported. Unable to disable vsync.\n";
+	}
+#endif
 
 	return context;
 }
@@ -180,11 +214,20 @@ int main(int argc, char **argv)
 	uint32_t sample_start_time = timer.realTime();
 	std::cout << "Entering render loop\n";
 	bool running = true;
+	int frames = 0;
+	uint32_t fps_timer = 0;
 	while(running)
 	{
 		mouse.frame_update();
 		timer.frame_update(SDL_GetTicks());
-		std::cout << timer.frameTime() << "ms    \r";
+		
+		fps_timer += timer.frameTime();
+		if(fps_timer > 1000)
+		{
+			std::cout << "\r" << frames << " fps";
+			fps_timer -= 1000;
+			frames = 0;
+		}
 		SDL_Event e;
 		while(SDL_PollEvent(&e))
 		{
@@ -269,6 +312,7 @@ int main(int argc, char **argv)
 		SDL_GL_SwapWindow(window.get());
 
 		camera_h.reset_update_flag();
+		frames++;
 	}
 
 	// SDL cleanup

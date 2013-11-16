@@ -23,8 +23,8 @@ cudaError_t setup_scene(Sphere **scene, int *nSpheres);
 
 #define PI 3.14159265359
 
-#define RESOLUTION_WIDTH	800
-#define RESOLUTION_HEIGHT	600
+#define RESOLUTION_WIDTH	640
+#define RESOLUTION_HEIGHT	480
 
 TTF_Font *font;
 
@@ -224,7 +224,7 @@ int main(int argc, char **argv)
 		fps_timer += timer.frameTime();
 		if(fps_timer > 1000)
 		{
-			std::cout << "\r" << frames << " fps";
+			std::cout << "\r" << frames << " fps  ";
 			fps_timer -= 1000;
 			frames = 0;
 		}

@@ -357,4 +357,5 @@ void CudaRayTracer::init_accumulation_buffer(const std::shared_ptr<OpenGLSurface
 	}
 
 	CUDA_CALL(cudaMalloc(&accumulation_buffer_d_, sizeof(Vector3d) * surface->resolution().x() * surface->resolution().y()));
+	CUDA_CALL(cudaMemset(accumulation_buffer_d_, 0, sizeof(Vector3d) * surface->resolution().x() * surface->resolution().y()));
 }

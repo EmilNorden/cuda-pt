@@ -200,60 +200,9 @@ __global__ void raytrace_kernel(int *ptr, Camera *camera, int depth, int sample,
 	Vector3d color;
 	Ray ray;
 	ray.depth_ = 0;
-	camera->cast_perturbed_ray(ray, index_x, index_y, 0.25, rand_state);
+	camera->cast_perturbed_ray(ray, index_x, index_y, 2, rand_state);
 
 	Sphere *spheres = *scene;
-	//Sphere spheres[4];
-	//spheres[0].radius = 1;
-	//spheres[0].position.x() = 0;
-	//spheres[0].position.y() = 10;
-	//spheres[0].position.z() = 0;
-	//spheres[0].diffuse.x() = 1;
-	//spheres[0].diffuse.y() = 1;
-	//spheres[0].diffuse.z() = 1;
-	//spheres[0].emissive = Vector3d(0.4, 0.4, 0.4) * 200;
-	//spheres[0].refl_coeff = 0;
-
-	//spheres[1].radius = 1.5;
-	//spheres[1].position.x() = -4;
-	//spheres[1].position.y() = 1.5;
-	//spheres[1].position.z() = -5;
-	//spheres[1].diffuse.x() = 1;
-	//spheres[1].diffuse.y() = 1;
-	//spheres[1].diffuse.z() = 1;
-	//spheres[1].emissive = Vector3d(0.0, 0.0, 0.0);
-	//spheres[1].refl_coeff = 1.0;
-
-	//spheres[2].radius = 1.5;
-	//spheres[2].position.x() = 0;
-	//spheres[2].position.y() = 1.5;
-	//spheres[2].position.z() = 5;
-	//spheres[2].diffuse.x() = 1;
-	//spheres[2].diffuse.y() = 0;
-	//spheres[2].diffuse.z() = 0;
-	//spheres[2].emissive = Vector3d(0.0, 0.0, 0.0);
-	//spheres[2].refl_coeff = 0.25;
-
-	//spheres[3].radius = 400;
-	//spheres[3].position.x() = 0;
-	//spheres[3].position.y() = -400;
-	//spheres[3].position.z() = 0;
-	//spheres[3].diffuse.x() = 1;
-	//spheres[3].diffuse.y() = 1;
-	//spheres[3].diffuse.z() = 1;
-	//spheres[3].emissive = Vector3d(1.0, 1.0, 1.0) * 0.0;
-	//spheres[3].refl_coeff = 0.0;
-
-	//// Tiny red ball
-	//spheres[4].radius = 0.25;
-	//spheres[4].position.x() = -4;
-	//spheres[4].position.y() = 1.5;
-	//spheres[4].position.z() = -3.375;
-	//spheres[4].diffuse.x() = 1;
-	//spheres[4].diffuse.y() = 0;
-	//spheres[4].diffuse.z() = 0;
-	//spheres[4].emissive = Vector3d(0.0, 0.0, 0.0);
-	//spheres[4].refl_coeff = 0.0;
 
 	trace(ray, spheres, nSpheres, depth, color, rand_state);
 

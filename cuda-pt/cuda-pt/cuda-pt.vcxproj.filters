@@ -47,6 +47,9 @@
     <ClCompile Include="src\opengl_surface.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\sprite.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\window.h">
@@ -107,6 +110,12 @@
       <Filter>Header files</Filter>
     </ClInclude>
     <ClInclude Include="src\cuda_raytracer.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="text.h\sprite.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\sprite.h">
       <Filter>Header files</Filter>
     </ClInclude>
   </ItemGroup>

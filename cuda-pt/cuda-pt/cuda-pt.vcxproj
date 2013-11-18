@@ -174,6 +174,7 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
     <CudaCompile Include="src\stack.cu" />
     <ClCompile Include="src\mouse_device.cpp" />
     <ClCompile Include="src\opengl_surface.cpp" />
+    <ClCompile Include="src\sprite.cpp" />
     <ClCompile Include="src\texture.cpp" />
     <ClCompile Include="src\window.cpp" />
   </ItemGroup>
@@ -191,6 +192,7 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
     <ClInclude Include="src\intersectioninfo.h" />
     <ClInclude Include="src\mouse_device.h" />
     <ClInclude Include="src\ray.h" />
+    <ClInclude Include="src\sprite.h" />
     <ClInclude Include="src\stack.h" />
     <ClInclude Include="src\static_uniform_heap.h" />
     <ClInclude Include="src\static_stack.h" />
@@ -198,6 +200,7 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
     <ClInclude Include="src\vector2.h" />
     <ClInclude Include="src\vector3.h" />
     <ClInclude Include="src\window.h" />
+    <ClInclude Include="text.h\sprite.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

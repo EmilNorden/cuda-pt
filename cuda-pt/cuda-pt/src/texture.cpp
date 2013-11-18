@@ -1,5 +1,6 @@
 #include "texture.h"
 #include "sdl.h"
+#include "error_assertion.h"
 //#include "sdl/extensions/SDL_image.h"
 
 Texture::Texture(SDL_Surface *surface)
@@ -33,6 +34,7 @@ Texture::Texture(SDL_Surface *surface)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
 	glTexImage2D(GL_TEXTURE_2D, 0, n_colors_, surface->w, surface->h, 0, texture_format_, GL_UNSIGNED_BYTE, surface->pixels);
+
 }
 
 Texture::~Texture()

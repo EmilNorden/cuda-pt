@@ -12,7 +12,6 @@ private:
 	GLuint texture_;
 	GLint n_colors_;
 	GLenum texture_format_;
-	SDL_Surface *surface_;
 	int width_;
 	int height_;
 public:

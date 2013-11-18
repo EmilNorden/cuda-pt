@@ -19,6 +19,6 @@ void report_gl_error_and_die(GLenum error, const char *file, int line);
 #define CUDA_CALL(x) if(x != cudaSuccess) { report_error_and_die(x, __FILE__, __LINE__);  }
 #define CUDA_DRIVER_CALL(x) if(x != CUDA_SUCCESS) { report_cuda_driver_error_and_die(x, __FILE__, __LINE__);  }
 
-#define GL_CALL(x) if(x != GL_NO_ERROR) { report_gl_error_and_die(x, __FILE__, __LINE__); } 
+#define GL_CALL(x) if((GLenum)x != (GLenum)GL_NO_ERROR) { report_gl_error_and_die(x, __FILE__, __LINE__); } 
 
 #endif

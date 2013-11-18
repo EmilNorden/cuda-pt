@@ -14,8 +14,10 @@
 #include "cmd_args.h"
 #include "opengl_surface.h"
 #include "cuda_raytracer.h"
+#include "sprite.h"
 
 #include <iostream>
+#include <sstream>
 
 
 
@@ -76,6 +78,8 @@ SDL_GLContext init_gl(SDLWindow &window)
 
 	// Enable Texturing
 	glEnable(GL_TEXTURE_2D);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
  
 	GL_CALL(glGetError());
 
@@ -142,8 +146,9 @@ void init_cuda()
 	/* Set CUDA Data Stack size */
 	std::cout << "Setting CUDA Data stack size...\n";
 	size_t stack_size;
-	CUDA_DRIVER_CALL(cuCtxGetLimit(&stack_size, CU_LIMIT_STACK_SIZE))
-	stack_size *= 3;
+	//CUDA_DRIVER_CALL(cuCtxGetLimit(&stack_size, CU_LIMIT_STACK_SIZE))
+	// Through very scientific methods (ie brute force testing)	 I have deduced my stack size to be 2705 bytes.
+	stack_size = 2705;
 	CUDA_DRIVER_CALL(cuCtxSetLimit(CU_LIMIT_STACK_SIZE, stack_size));
 	std::cout << "Successfully set CUDA Data stack size to " << stack_size << " bytes\n";
 }
@@ -179,6 +184,16 @@ int main(int argc, char **argv)
 
 	std::cout << "Initializing OpenGL...\n";
 	SDL_GLContext context = init_gl(window);
+
+	SDLFont sdl_font(std::string("../Resources/SourceSansPro-Regular.ttf"), 32);
+	SDL_Color clr;
+	clr.r = 255;
+	clr.g = 0;
+	clr.b = 0;
+	clr.a = 255;
+
+	Sprite sprite_fps(RenderText("0 fps", sdl_font, clr), Vector2d(0, 0));
+	//Sprite focal_fps(RenderText("Focal length: 0", sdl_font, clr), Vector2d(0, sprite_fps.texture()->height()));
 
 	std::cout << "Initializing CUDA...\n";
 	init_cuda();
@@ -218,6 +233,8 @@ int main(int argc, char **argv)
 	uint32_t fps_timer = 0;
 	while(running)
 	{
+
+		glClear(GL_COLOR_BUFFER_BIT);
 		mouse.frame_update();
 		timer.frame_update(SDL_GetTicks());
 		
@@ -225,6 +242,11 @@ int main(int argc, char **argv)
 		if(fps_timer > 1000)
 		{
 			std::cout << "\r" << frames << " fps  ";
+			std::stringstream ss;
+			ss << "FPS: " << frames;
+			GL_CALL(glGetError());
+			//sprite_fps.set_texture(RenderText(ss.str(), sdl_font, clr));
+			GL_CALL(glGetError());
 			fps_timer -= 1000;
 			frames = 0;
 		}
@@ -307,8 +329,11 @@ int main(int argc, char **argv)
 		
 		surface->draw();
 
-		GL_CALL(glGetError());
 		
+		
+		sprite_fps.draw(RESOLUTION_WIDTH, RESOLUTION_HEIGHT);
+
+		glLoadIdentity();
 		SDL_GL_SwapWindow(window.get());
 
 		camera_h.reset_update_flag();

@@ -73,8 +73,8 @@ public:
 		return updated_this_frame_;
 	}
 
-	CUDA_CALLABLE void cast_ray(Ray &ray, int x, int y) const;
-	CUDA_CALLABLE void cast_ray(Ray *ray, int x, int y) const;
+	__device__ void cast_ray(Ray &ray, int x, int y) const;
+	__device__ void cast_ray(Ray *ray, int x, int y) const;
 
 	__device__ void cast_perturbed_ray(Ray &ray, int x, int y, double radius, curandState &rand_state) const;
 

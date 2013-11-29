@@ -13,6 +13,12 @@
     <CudaCompile Include="src\cuda_raytracer.cu">
       <Filter>Source Files</Filter>
     </CudaCompile>
+    <CudaCompile Include="src\octree.cu">
+      <Filter>Source Files</Filter>
+    </CudaCompile>
+    <CudaCompile Include="src\aabb.cu">
+      <Filter>Source Files</Filter>
+    </CudaCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Header files">
@@ -116,6 +122,15 @@
       <Filter>Header files</Filter>
     </ClInclude>
     <ClInclude Include="src\sprite.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\aabb.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\device_list.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\octree.h">
       <Filter>Header files</Filter>
     </ClInclude>
   </ItemGroup>

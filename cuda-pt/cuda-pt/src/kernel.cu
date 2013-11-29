@@ -6,12 +6,15 @@
 #include <stack>
 
 #include "Sphere.h"
+#include "octree.h"
 
 #include "camera.h"
 
 #include "intersectioninfo.h"
 
 #include <curand_kernel.h>
+
+#include <ctime>
 //
 //__device__ void trace(Ray &ray, Sphere *spheres, int nSpheres, int max_depth, Vector3d &color, curandState &rand_state);
 //__device__ void shade(Ray &ray, const IntersectionInfo &ii, Sphere *spheres, int index, int nSpheres, int max_depth, Vector3d &color, curandState &rand_state);
@@ -323,6 +326,130 @@
 //	return cudaDeviceSynchronize();
 //}
 //
+
+//__global__ void setup_scene_kernel(Sphere **scene, int *nSpheres)
+//{
+//	Sphere *spheres = new Sphere[66];
+//
+//	double angle_step = (3.14159265359 * 2) / 4.0;
+//	for(int i = 0; i < 8; ++i)
+//	{
+//		for(int j = 0; j < 8; ++j)
+//		{
+//			spheres[i + (j * 8) + 2].radius = 1;
+//			spheres[i + (j * 8) + 2].position.x() = -6 + i*2;
+//			spheres[i + (j * 8) + 2].position.y() = 3 + (sin((i + (j * 8) / 63.0) * 4)) * 0.3;
+//			spheres[i + (j * 8) + 2].position.z() = -6 + j*2;
+//			spheres[i + (j * 8) + 2].diffuse.x() = (i / 7.0);
+//			spheres[i + (j * 8) + 2].diffuse.y() = 1;
+//			spheres[i + (j * 8) + 2].diffuse.z() = (j / 7.0);
+//			spheres[i + (j * 8) + 2].emissive = Vector3d(1.0, 1.0, 1.0) * 0;
+//			spheres[i + (j * 8) + 2].refl_coeff = 0;
+//
+//			if(((i + (j * 8) + 2) % 2) == 0)
+//			{
+//				spheres[i + (j * 8) + 2].refl_coeff = 0.5;
+//			}
+//			//if((i == 0 || i == 7) && (j == 0 || j == 7))
+//			//{
+//			//	spheres[i + (j * 8) + 2].emissive = Vector3d(1.0, 1.0, 1.0) * 0;
+//			//}
+//			//else
+//			//{
+//			//	spheres[i + (j * 8) + 2].emissive = Vector3d(1.0, 1.0, 1.0) * 0;
+//			//}
+//		}
+//	}
+//	spheres[0].radius = 400;
+//	spheres[0].position.x() = 0;
+//	spheres[0].position.y() = -400;
+//	spheres[0].position.z() = 0;
+//	spheres[0].diffuse.x() = 1;//0.5;
+//	spheres[0].diffuse.y() = 1;
+//	spheres[0].diffuse.z() = 1;//0.5;
+//	spheres[0].emissive = Vector3d(1.0, 0.5, 0.5) * 0;
+//	spheres[0].refl_coeff = 0.00;
+//
+//	spheres[1].radius = 20;
+//	spheres[1].position.x() = 0;
+//	spheres[1].position.y() = 30;
+//	spheres[1].position.z() = -60;
+//	spheres[1].diffuse.x() = 0.5;
+//	spheres[1].diffuse.y() = 1;
+//	spheres[1].diffuse.z() = 0.5;
+//	spheres[1].emissive = Vector3d(1.0, 0.8, 0.8) * 600;
+//	spheres[1].refl_coeff = 0.00;
+//
+//	*scene = spheres;
+//	*nSpheres = 66;
+//}
+
+__global__ void setup_octree_kernel(Sphere **spheres, int nspheres, Octree **octree)
+{
+	Octree *tree = new Octree;
+	for(int i = 0; i < nspheres; ++i)
+		tree->spheres.add((*spheres)[i]);
+
+	tree->build();
+	*octree = tree;
+}
+
+//__global__ void setup_scene_kernel(Sphere **scene, int *nSpheres)
+//{
+//	Sphere *spheres = new Sphere[9];
+//
+//	double angle_step = (3.14159265359 * 2) / 4.0;
+//	for(int i = 0; i < 4; ++i)
+//	{
+//		double angle = angle_step * (i-2);
+//		double x = sin(angle) * 3;
+//		double z = cos(angle) * 3;
+//
+//		spheres[i].radius = 1.5;
+//		spheres[i].position.x() = x;
+//		spheres[i].position.y() = 1.5;
+//		spheres[i].position.z() = z;
+//		spheres[i].diffuse.x() = 1;
+//		spheres[i].diffuse.y() = 1;
+//		spheres[i].diffuse.z() = 1;
+//		spheres[i].emissive = Vector3d(1.0, 1.0, 1.0);
+//		spheres[i].refl_coeff = 0.75;
+//	}
+//
+//	for(int i = 4; i < 8; ++i)
+//	{
+//		double angle = angle_step * (i-2);
+//		double x = sin(angle) * 5;
+//		double z = cos(angle) * 5;
+//
+//		spheres[i].radius = 0.5;
+//		spheres[i].position.x() = x;
+//		spheres[i].position.y() = 1.5;
+//		spheres[i].position.z() = z;
+//		spheres[i].diffuse.x() = 1;
+//		spheres[i].diffuse.y() = 1;
+//		spheres[i].diffuse.z() = 1;
+//		spheres[i].emissive = Vector3d(1.0, 1.0, 1.0) * 0;
+//		spheres[i].refl_coeff = 0.75;
+//	}
+//
+//	spheres[8].radius = 400;
+//	spheres[8].position.x() = 0;
+//	spheres[8].position.y() = -400;
+//	spheres[8].position.z() = 0;
+//	spheres[8].diffuse.x() = 0.5;
+//	spheres[8].diffuse.y() = 1;
+//	spheres[8].diffuse.z() = 0.5;
+//	spheres[8].emissive = Vector3d(1.0, 0.5, 0.5) * 0;
+//	spheres[8].refl_coeff = 0.00;
+//
+//	*scene = spheres;
+//	*nSpheres = 9;
+//}
+
+
+
+
 __global__ void setup_scene_kernel(Sphere **scene, int *nSpheres)
 {
 	Sphere *spheres = new Sphere[8];
@@ -362,16 +489,23 @@ __global__ void setup_scene_kernel(Sphere **scene, int *nSpheres)
 		spheres[i].diffuse.y() = 1;
 		spheres[i].diffuse.z() = 1;
 		spheres[i].emissive = Vector3d(0.0, 0.0, 0.0);
-		spheres[i].refl_coeff = 0.75;
+		spheres[i].refl_coeff = 0.1;
 	}
 
 	*scene = spheres;
-	*nSpheres = 6;
+	*nSpheres = 8;
 }
 
 cudaError_t setup_scene(Sphere **spheres, int *nSpheres)
 {
 	setup_scene_kernel<<<1, 1>>>(spheres, nSpheres);
+
+	return cudaDeviceSynchronize();
+}
+
+cudaError_t setup_octree(Sphere **spheres, int nspheres, Octree **octree)
+{
+	setup_octree_kernel<<<1, 1>>>(spheres, nspheres, octree);
 
 	return cudaDeviceSynchronize();
 }

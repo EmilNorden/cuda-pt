@@ -113,6 +113,13 @@ public:
 		return sqrt(pow(v_[0], 2) + pow(v_[1], 2) + pow(v_[2], 2));
 	}
 
+	__device__ double length_device() const {
+		return __dsqrt_rn(
+			__fma_rn(v_[0], v_[0], 
+				__fma_rn(v_[1], v_[1],
+					__dmul_rn(v_[2], v_[2]))));
+	}
+
 	CUDA_CALLABLE double length_squared() const {
 		return pow(v_[0], 2) + pow(v_[1], 2) + pow(v_[2], 2);
 	}
@@ -122,6 +129,13 @@ public:
 		v_[0] /= len;
 		v_[1] /= len;
 		v_[2] /= len;
+	}
+
+	__device__ void normalize_device() {
+		double len_rcp = __drcp_rn(length_device());
+		v_[0] = __dmul_rn(v_[0], len_rcp);
+		v_[1] = __dmul_rn(v_[1], len_rcp);
+		v_[2] = __dmul_rn(v_[2], len_rcp);
 	}
 
 	CUDA_CALLABLE Vector3 normal_component(const Vector3 &n) const {
@@ -140,6 +154,10 @@ public:
 
 	CUDA_CALLABLE double dot(const Vector3 &other) const {
 		return x() * other.x() + y() * other.y() + z() * other.z();
+	}
+
+	__device__ double dot_device(const Vector3 &other) const {
+		return __fma_rn(v_[0], other.v_[0], __fma_rn(v_[1], other.v_[1], __dmul_rn(v_[2], other.v_[2])));
 	}
 
 	CUDA_CALLABLE bool is_zero() const {
@@ -190,24 +208,14 @@ public:
 
 	__device__ static Vector3 rand_unit_in_hemisphere(const Vector3 &normal, curandState &state)
 	{
-
-		//double mt_x = ((rand() / (double)RAND_MAX) * 2) - 1.0;
-		//double mt_y = ((rand() / (double)RAND_MAX) * 2) - 1.0;
-		//double mt_z = ((rand() / (double)RAND_MAX) * 2) - 1.0;
-		
 		double mt_x = (curand_uniform(&state) * 2) - 1.0;
 		double mt_y = (curand_uniform(&state) * 2) - 1.0;
 		double mt_z = (curand_uniform(&state) * 2) - 1.0;
 
 		Vector3 vector(mt_x, mt_y, mt_z);
-		vector.normalize();
-
-		if(vector.dot(normal) < 0)
-		{
-			vector.x() = -vector.x();
-			vector.y() = -vector.y();
-			vector.z() = -vector.z();
-		}
+		vector.normalize_device();
+		if(vector.dot_device(normal) < 0)
+			vector.flip();
 
 		return vector;
 	}

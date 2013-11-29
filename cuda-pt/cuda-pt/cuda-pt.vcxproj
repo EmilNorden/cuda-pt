@@ -139,6 +139,7 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
     <CudaCompile>
       <GenerateRelocatableDeviceCode>true</GenerateRelocatableDeviceCode>
       <CodeGeneration>compute_30,sm_35</CodeGeneration>
+      <PtxAsOptionV>true</PtxAsOptionV>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -165,6 +166,7 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
     <CudaCompile Include="src\camera.cu">
       <FileType>Document</FileType>
     </CudaCompile>
+    <CudaCompile Include="src\aabb.cu" />
     <ClCompile Include="src\cmd_args.cpp" />
     <ClCompile Include="src\error_assertion.cpp" />
     <ClCompile Include="src\font.cpp" />
@@ -173,17 +175,21 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
     <CudaCompile Include="src\kernel.cu" />
     <CudaCompile Include="src\stack.cu" />
     <ClCompile Include="src\mouse_device.cpp" />
+    <CudaCompile Include="src\octree.cu" />
     <ClCompile Include="src\opengl_surface.cpp" />
     <ClCompile Include="src\sprite.cpp" />
     <ClCompile Include="src\texture.cpp" />
     <ClCompile Include="src\window.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\aabb.h" />
     <ClInclude Include="src\camera.h" />
     <ClInclude Include="src\cmd_args.h" />
     <ClInclude Include="src\cuda_raytracer.h" />
+    <ClInclude Include="src\device_list.h" />
     <ClInclude Include="src\error_assertion.h" />
     <ClInclude Include="src\font.h" />
+    <ClInclude Include="src\octree.h" />
     <ClInclude Include="src\opengl_surface.h" />
     <ClInclude Include="src\SDL_ttf.h" />
     <ClInclude Include="src\shared_device_pointer.h" />

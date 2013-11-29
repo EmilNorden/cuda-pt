@@ -15,18 +15,20 @@
 #include "opengl_surface.h"
 #include "cuda_raytracer.h"
 #include "sprite.h"
+#include "octree.h"
 
 #include <iostream>
 #include <sstream>
-
+#include <ctime>
 
 
 cudaError_t setup_scene(Sphere **scene, int *nSpheres);
+cudaError_t setup_octree(Sphere **spheres, int nspheres, Octree **octree);
 
 #define PI 3.14159265359
 
-#define RESOLUTION_WIDTH	640
-#define RESOLUTION_HEIGHT	480
+#define RESOLUTION_WIDTH	1920
+#define RESOLUTION_HEIGHT	1080
 
 TTF_Font *font;
 
@@ -34,6 +36,8 @@ int	nSpheres;
 
 // Device memory pointers
 Sphere		**scene_d;
+
+Octree		**octree_d;
 
 bool WGLExtensionSupported(const char *extension_name)
 {
@@ -148,7 +152,7 @@ void init_cuda()
 	size_t stack_size;
 	//CUDA_DRIVER_CALL(cuCtxGetLimit(&stack_size, CU_LIMIT_STACK_SIZE))
 	// Through very scientific methods (ie brute force testing)	 I have deduced my stack size to be 2705 bytes.
-	stack_size = 2705;
+	stack_size = 2700;
 	CUDA_DRIVER_CALL(cuCtxSetLimit(CU_LIMIT_STACK_SIZE, stack_size));
 	std::cout << "Successfully set CUDA Data stack size to " << stack_size << " bytes\n";
 }
@@ -158,10 +162,13 @@ void init_scene()
 	int *nSpheres_d;
 	cudaMalloc(&scene_d, sizeof(Sphere*));
 	cudaMalloc(&nSpheres_d, sizeof(int));
+	cudaMalloc(&octree_d, sizeof(Octree*));
 
 	CUDA_CALL(setup_scene(scene_d, nSpheres_d));
 	CUDA_CALL(cudaMemcpy(&nSpheres, nSpheres_d, sizeof(int), cudaMemcpyDeviceToHost));
 	CUDA_CALL(cudaFree(nSpheres_d));
+
+	//CUDA_CALL(setup_octree(scene_d, nSpheres, octree_d));
 }
 
 std::shared_ptr<Texture> RenderText(std::string message, SDLFont &font, 
@@ -180,7 +187,7 @@ int main(int argc, char **argv)
 	std::cout << "Initializing SDL...\n";
 	SDL_Init(SDL_INIT_EVERYTHING);
 	TTF_Init();
-	SDLWindow window(SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, RESOLUTION_WIDTH, RESOLUTION_HEIGHT, false, "CUDA Pathtracing");
+	SDLWindow window(SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, RESOLUTION_WIDTH, RESOLUTION_HEIGHT, true, "CUDA Pathtracing");
 
 	std::cout << "Initializing OpenGL...\n";
 	SDL_GLContext context = init_gl(window);
@@ -191,6 +198,8 @@ int main(int argc, char **argv)
 	clr.g = 0;
 	clr.b = 0;
 	clr.a = 255;
+
+	srand(time(NULL));
 
 	Sprite sprite_fps(RenderText("0 fps", sdl_font, clr), Vector2d(0, 0));
 	//Sprite focal_fps(RenderText("Focal length: 0", sdl_font, clr), Vector2d(0, sprite_fps.texture()->height()));
@@ -316,11 +325,17 @@ int main(int argc, char **argv)
 
 			Vector3d direction = Vector3d(std::sin(view_rot_x), 0, std::cos(view_rot_x)) + Vector3d(0, std::sin(view_rot_y), std::cos(view_rot_y));
 			direction.normalize();
+			
 			camera_h.set_direction(direction);
 		}
 
 		if(frame_changed)
 		{
+			double dist;
+			tracer.get_camera_distance(camera_h, Vector2i(RESOLUTION_WIDTH / 2, RESOLUTION_HEIGHT / 2), scene_d, nSpheres, dist);
+			if(dist > 1000)
+				dist = 1000;
+			camera_h.set_focal_length(dist);
 			frame_changed = false;
 			camera_h.update();
 		}
@@ -331,7 +346,7 @@ int main(int argc, char **argv)
 
 		
 		
-		sprite_fps.draw(RESOLUTION_WIDTH, RESOLUTION_HEIGHT);
+		//sprite_fps.draw(RESOLUTION_WIDTH, RESOLUTION_HEIGHT);
 
 		glLoadIdentity();
 		SDL_GL_SwapWindow(window.get());

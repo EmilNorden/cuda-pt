@@ -42,14 +42,14 @@ void Camera::cast_ray(Ray *ray, int x, int y) const {
 	ray->origin_ = position_;
 
 	ray->direction_ = (image_plane_start_ - (u_ * pixel_width_ * (double)x) + (v_ * pixel_height_ * (double)y)) - position_;
-	ray->direction_.normalize();
+	ray->direction_.normalize_device();
 }
 
 void Camera::cast_ray(Ray &ray, int x, int y) const {
 	ray.origin_ = position_;
 
 	ray.direction_ = (image_plane_start_ - (u_ * pixel_width_ * (double)x) + (v_ * pixel_height_ * (double)y)) - position_;
-	ray.direction_.normalize();
+	ray.direction_.normalize_device();
 }
 
 __device__ void Camera::cast_perturbed_ray(Ray &ray, int x, int y, double radius, curandState &rand_state) const
@@ -63,7 +63,7 @@ __device__ void Camera::cast_perturbed_ray(Ray &ray, int x, int y, double radius
 
 	ray.origin_ = position_ + (u_ * sin(angle) * length) + (v_ * cos(angle) * length);
 	ray.direction_ = focus_point - ray.origin_;
-	ray.direction_.normalize();
+	ray.direction_.normalize_device();
 
 	// This created a rectangular blur
 	/*double u_shift = curand_uniform(&rand_state);

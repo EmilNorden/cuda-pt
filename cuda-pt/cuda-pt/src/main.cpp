@@ -27,8 +27,8 @@ cudaError_t setup_octree(Sphere **spheres, int nspheres, Octree **octree);
 
 #define PI 3.14159265359
 
-#define RESOLUTION_WIDTH	1920
-#define RESOLUTION_HEIGHT	1080
+#define RESOLUTION_WIDTH	1280
+#define RESOLUTION_HEIGHT	1024
 
 TTF_Font *font;
 
@@ -187,7 +187,7 @@ int main(int argc, char **argv)
 	std::cout << "Initializing SDL...\n";
 	SDL_Init(SDL_INIT_EVERYTHING);
 	TTF_Init();
-	SDLWindow window(SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, RESOLUTION_WIDTH, RESOLUTION_HEIGHT, true, "CUDA Pathtracing");
+	SDLWindow window(SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, RESOLUTION_WIDTH, RESOLUTION_HEIGHT, false, "CUDA Pathtracing");
 
 	std::cout << "Initializing OpenGL...\n";
 	SDL_GLContext context = init_gl(window);
@@ -220,7 +220,7 @@ int main(int argc, char **argv)
 	Vector3d focus_point(0, 1.5, 5);
 	double focal_length = (focus_point - cam_pos).length();
 	Camera camera_h(cam_pos, cam_target, Vector3d(0, 1, 0), PI / 4.0, (double)RESOLUTION_WIDTH / RESOLUTION_HEIGHT, Vector2i(RESOLUTION_WIDTH, RESOLUTION_HEIGHT), focal_length);
-
+	camera_h.set_blur_radius(0.125 * 1);
 	auto surface = OpenGLSurface::create(RESOLUTION_WIDTH, RESOLUTION_HEIGHT);
 	tracer.set_surface(surface);
 	
@@ -240,6 +240,7 @@ int main(int argc, char **argv)
 	bool running = true;
 	int frames = 0;
 	uint32_t fps_timer = 0;
+	bool use_pt = true;
 	while(running)
 	{
 
@@ -250,7 +251,7 @@ int main(int argc, char **argv)
 		fps_timer += timer.frameTime();
 		if(fps_timer > 1000)
 		{
-			std::cout << "\r" << frames << " fps  ";
+			std::cout << "\r" << frames << " fps  -  Samples: " << tracer.get_current_sample() << "     ";
 			std::stringstream ss;
 			ss << "FPS: " << frames;
 			GL_CALL(glGetError());
@@ -284,12 +285,22 @@ int main(int argc, char **argv)
 		if(data[SDL_SCANCODE_UP])
 		{
 			frame_changed = true;
-			camera_h.set_focal_length(camera_h.focal_length() + 0.1);
+			camera_h.set_blur_radius(camera_h.blur_radius() + 0.1);	
 		}
 		if(data[SDL_SCANCODE_DOWN])
 		{
 			frame_changed = true;
-			camera_h.set_focal_length(camera_h.focal_length() - 0.1);	
+			camera_h.set_blur_radius(camera_h.blur_radius() - 0.1);	
+		}
+		if(data[SDL_SCANCODE_1])
+		{
+			tracer.set_use_pathtracing(false);
+			frame_changed = true;
+		}
+		else if(data[SDL_SCANCODE_2])
+		{
+			tracer.set_use_pathtracing(true);
+			frame_changed = true;
 		}
 
 		if(mouse.left_button() & Pressed && mouse.left_button() & ChangedThisFrame)
@@ -302,7 +313,7 @@ int main(int argc, char **argv)
 		{
 			dragging = false;
 		}
-
+		
 		if(mouse.right_button() & Released &&
 			mouse.right_button() & ChangedThisFrame)
 		{
@@ -323,7 +334,7 @@ int main(int argc, char **argv)
 			view_rot_x += diff.x() * 0.005;
 			view_rot_y += diff.y() * 0.005;
 
-			Vector3d direction = Vector3d(std::sin(view_rot_x), 0, std::cos(view_rot_x)) + Vector3d(0, std::sin(view_rot_y), std::cos(view_rot_y));
+			Vector3d direction = Vector3d(std::sin(view_rot_x), 0, std::cos(view_rot_x)) + Vector3d(0, std::sin(view_rot_y), 0);
 			direction.normalize();
 			
 			camera_h.set_direction(direction);
@@ -351,7 +362,7 @@ int main(int argc, char **argv)
 		glLoadIdentity();
 		SDL_GL_SwapWindow(window.get());
 
-		camera_h.reset_update_flag();
+		//camera_h.reset_update_flag();
 		frames++;
 	}
 

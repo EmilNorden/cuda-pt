@@ -2,7 +2,6 @@
 #include "cuda_runtime.h"
 #include "device_functions.h"
 #include "device_launch_parameters.h"
-
 #include <stdio.h>
 #include <stack>
 
@@ -18,8 +17,8 @@
 
 cudaStream_t stream1, stream2, stream3, stream4;
 
-__device__ void trace(const Ray &ray, const Sphere *spheres, const int nSpheres, const int max_depth, Vector3d &color, curandState &rand_state, const double branch_factor);
-__device__ void shade(const Ray &ray, const IntersectionInfo &ii, const Sphere *spheres, const int index, const int nSpheres, const int max_depth, Vector3d &color, curandState &rand_state, const double branch_factor);
+__device__ void trace(const Ray &ray, const Sphere *spheres, const int nSpheres, const int max_depth, Vector3d &color, curandState &rand_state, const double branch_factor, bool use_pt);
+__device__ void shade(const Ray &ray, const IntersectionInfo &ii, const Sphere *spheres, const unsigned int index, const int nSpheres, const int max_depth, Vector3d &color, curandState &rand_state, const double branch_factor, bool use_pt);
 //
 //__device__ bool intersect(Ray &ray, const Sphere &sphere, IntersectionInfo &ii) {
 //	double a = ray.direction_.dot(ray.direction_);
@@ -64,10 +63,11 @@ __device__ bool intersect(const Ray &ray, const Sphere &sphere, IntersectionInfo
 		return false;
 
 	ii.distance = abs(num6 - sqrt(num5 - num7));
-	ii.coordinate = ray.origin_ + (ray.direction_ * ii.distance);
-	ii.surface_normal = ii.coordinate - sphere.position;
+	ii.object_pos = sphere.position;
+	//ii.coordinate = ray.origin_ + (ray.direction_ * ii.distance);
+	//ii.surface_normal = ii.coordinate - sphere.position;
 
-	ii.surface_normal.normalize_device();
+	//ii.surface_normal.normalize_device();
 
 
 	return true;
@@ -80,7 +80,7 @@ __device__ int get_intersected_sphere(const Ray &ray, const Sphere *spheres, con
 	for(int i = 0; i < nSpheres; ++i)
 	{
 		IntersectionInfo temp_ii;
-		if(intersect(ray, spheres[i], temp_ii) && temp_ii.distance < best_dist)
+		if(intersect(ray, spheres[i], temp_ii) && temp_ii.distance < best_dist) //if(spheres[i].intersect(ray, temp_ii) && temp_ii.distance < best_dist)
 		{
 			best_dist = temp_ii.distance;
 			intersection_index = i;
@@ -93,17 +93,22 @@ __device__ int get_intersected_sphere(const Ray &ray, const Sphere *spheres, con
 
 __device__ int get_intersected_sphere(const Ray &ray, const Sphere *spheres, const int nSpheres, IntersectionInfo &ii)
 {
-	int intersection_index = -1;
+	int intersection_index = 0;
 	ii.distance = DBL_MAX;
 	for(int i = 0; i < nSpheres; ++i)
 	{
 		IntersectionInfo temp_ii;
-		if(intersect(ray, spheres[i], temp_ii) && temp_ii.distance < ii.distance)
+		if(intersect(ray, spheres[i], temp_ii) && temp_ii.distance < ii.distance) //if(spheres[i].intersect(ray, temp_ii) && temp_ii.distance < ii.distance)
 		{
 			ii = temp_ii;
-			intersection_index = i;
+			intersection_index = i + 1;
 		}
 	}
+
+	ii.coordinate = ray.origin_ + (ray.direction_ * ii.distance);
+	ii.surface_normal = ii.coordinate - ii.object_pos;
+
+	ii.surface_normal.normalize_device();
 
 	return intersection_index;
 }
@@ -116,10 +121,10 @@ __device__ void shade_light(const Sphere &light, const IntersectionInfo &ii, con
 	double dot = dir.dot_device(ii.surface_normal);
 	if(dot < 0)
 		dot = 0;
-	color += light.emissive * object.diffuse * dot * inv_square_length;
+	color += light.emissive * object.diffuse * dot * inv_square_length ;//* (1-object.refl_coeff);
 }
 
-__device__ void pathtrace(const Ray &ray, const IntersectionInfo &ii, const int sphere_index, const Sphere *spheres, const int nSpheres, const int max_depth, Vector3d &color, curandState &rand_state, const double branch_factor)
+__device__ void pathtrace(const Ray &ray, const IntersectionInfo &ii, const unsigned int sphere_index, const Sphere *spheres, const int nSpheres, const int max_depth, Vector3d &color, curandState &rand_state, const double branch_factor)
 {
 	Vector3d random_dir = Vector3d::rand_unit_in_hemisphere(ii.surface_normal, rand_state);
 	Ray random_ray;
@@ -128,38 +133,42 @@ __device__ void pathtrace(const Ray &ray, const IntersectionInfo &ii, const int 
 	random_ray.origin_ = ii.coordinate;
 	random_ray.direction_ = random_dir;
 
+	float importance = 1; // random_dir.dot(ii.surface_normal);
+
 	IntersectionInfo random_ii;
 
 	int random_sphere_index = get_intersected_sphere(random_ray, spheres, nSpheres, random_ii);
-	if(random_sphere_index != -1)
-	{
-		Vector3d viewer = ray.direction_ * -1;
-		Vector3d halfway = (random_dir + viewer);
-		halfway.normalize_device();
 
-		double factor = halfway.dot_device(ii.surface_normal);
+	Vector3d viewer = ray.direction_ * -1;
+	Vector3d halfway = (random_dir + viewer);
+	halfway.normalize_device();
 
-		Vector3d random_color;
-		shade(random_ray, random_ii, spheres, random_sphere_index, nSpheres, max_depth, random_color, rand_state, branch_factor);
-		color += spheres[sphere_index].diffuse * random_color * pow(factor, 2);
-	}
+	Vector3d random_color;
+	shade(random_ray, random_ii, spheres, random_sphere_index - 1, nSpheres, max_depth, random_color, rand_state, branch_factor, true);
+
+	Vector3d dir = random_ii.coordinate - ii.coordinate;
+	color += spheres[sphere_index].diffuse * random_color;// * (1-spheres[sphere_index].refl_coeff);
 }
 
-__device__ void shade(const Ray &ray, const IntersectionInfo &ii, const Sphere *spheres, const int index, const int nSpheres, const int max_depth, Vector3d &color, curandState &rand_state, const double branch_factor)
+__device__ void shade(const Ray &ray, const IntersectionInfo &ii, const Sphere *spheres, const unsigned int index, const int nSpheres, const int max_depth, Vector3d &color, curandState &rand_state, const double branch_factor, bool use_pt)
 {
+	const unsigned int sphere_index = index % nSpheres;
 	if(ray.depth_ > max_depth)
 		return;
 
-	color += spheres[index].emissive;
+	color += spheres[sphere_index].emissive;
 
-	if(branch_factor > spheres[index].refl_coeff)
+	
+
+	if(branch_factor > spheres[sphere_index].refl_coeff)
 	{
 		// Path tracing
-		pathtrace(ray, ii, index, spheres, nSpheres, max_depth, color, rand_state, branch_factor);
+		if(use_pt)
+			pathtrace(ray, ii, sphere_index, spheres, nSpheres, max_depth, color, rand_state, branch_factor);
 		//// Diffuse
 		for(int i = 0; i < nSpheres; ++i)
 		{
-			if(i != index && !spheres[i].emissive.is_zero())
+			if(i != sphere_index	&& !spheres[i].emissive.is_zero())
 			{
 				Ray shadow_ray;
 				shadow_ray.origin_ = ii.coordinate;
@@ -168,7 +177,7 @@ __device__ void shade(const Ray &ray, const IntersectionInfo &ii, const Sphere *
 
 				if (get_intersected_sphere(shadow_ray, spheres, nSpheres) == i)
 				{
-					shade_light(spheres[i], ii, spheres[index], color);
+					shade_light(spheres[i], ii, spheres[sphere_index], color);
 				}
 			}
 		}
@@ -184,41 +193,50 @@ __device__ void shade(const Ray &ray, const IntersectionInfo &ii, const Sphere *
 		reflected_ray.direction_.normalize_device();
 
 		Vector3d refl_color;
-		trace(reflected_ray, spheres, nSpheres, max_depth, refl_color, rand_state, branch_factor);
-		color += refl_color;
+		trace(reflected_ray, spheres, nSpheres, max_depth, refl_color, rand_state, branch_factor, use_pt);
+		color += refl_color;// * spheres[index].refl_coeff;
 	}
 }
 
-__device__ void trace(const Ray &ray, const Sphere *spheres, const int nSpheres, const int max_depth, Vector3d &color, curandState &rand_state, const double branch_factor)
+__device__ void trace(const Ray &ray, const Sphere *spheres, const int nSpheres, const int max_depth, Vector3d &color, curandState &rand_state, const double branch_factor, bool use_pt)
 {
 	IntersectionInfo ii;
 	int sphere_index = get_intersected_sphere(ray, spheres, nSpheres, ii);
 
-	if(sphere_index != -1)
-	{
-		shade(ray, ii, spheres, sphere_index, nSpheres, max_depth, color, rand_state, branch_factor);
-	}
+	shade(ray, ii, spheres, sphere_index - 1, nSpheres, max_depth, color, rand_state, branch_factor, use_pt);
+	color.multiply(((sphere_index | (~sphere_index + 1)) >> 31) & 1);
+	
 }
 
-__global__ void raytrace_kernel(int *ptr, Camera *camera, int depth, int sample, Vector3d *buffer_d, curandState *rand_states, const Vector2i *resolution_d, Sphere **scene, int nSpheres, int y_offset)
+__global__ void raytrace_kernel(int *ptr, Camera *camera, int depth, int sample, Vector3d *buffer_d, curandState *rand_states, const Vector2i *resolution_d, Sphere **scene, int nSpheres, int y_offset, bool use_pt)
 {
 	int index_x = blockIdx.x * blockDim.x + threadIdx.x;
 	int index_y = blockIdx.y * blockDim.y + threadIdx.y;
 	index_y += y_offset;
 
 	curandState &rand_state = rand_states[index_y * resolution_d->x() + index_x];
+	Sphere *spheres = *scene;
+
+	__shared__ Sphere spheres2[64];
+	memcpy(spheres2, *scene, sizeof(Sphere) * nSpheres);
+	
 	Vector3d color;
 	Ray ray;
 	ray.depth_ = 0;
-	camera->cast_perturbed_ray(ray, index_x, index_y, 0.125, rand_state);
+	camera->cast_perturbed_ray(ray, index_x, index_y, rand_state);
 
-	Sphere *spheres = *scene;
+	
 
 	double branch_factor = curand_uniform(&rand_state);
-
-	trace(ray, spheres, nSpheres, depth, color, rand_state, branch_factor);
+	//clock_t start = clock();
+	trace(ray, spheres2, nSpheres, depth, color, rand_state, branch_factor, use_pt);
+	//clock_t end = clock();
+	
+	//double factor = (end - start) / 1000.0;
+	//Vector3d current_color(factor, 0, 1 - factor);
 
 	color.clamp(Vector3d(0, 0, 0), Vector3d(1, 1, 1));
+
 
 	Vector3d &current_color = buffer_d[index_y * (resolution_d->x()) + index_x];
 	current_color.multiply(sample);
@@ -227,11 +245,45 @@ __global__ void raytrace_kernel(int *ptr, Camera *camera, int depth, int sample,
 	ptr[index_y * resolution_d->x() + index_x] = 255 << 24 | static_cast<int>(current_color.x() * 255) << 16  | static_cast<int>(current_color.y() * 255) << 8 | static_cast<int>(current_color.z() * 255);
 }
 
+__global__ void raytrace_interpolation_kernel(int *ptr, Camera *camera, int depth, int sample, Vector3d *buffer_d, curandState *rand_states, const Vector2i *resolution_d, Sphere **scene, int nSpheres, int y_offset, bool use_pt)
+{
+	int index_x = blockIdx.x * blockDim.x + threadIdx.x;
+	int index_y = blockIdx.y * blockDim.y + threadIdx.y;
+	index_y += y_offset;
+
+	int index = index_y * resolution_d->x() + index_x;
+	//
+	curandState &rand_state = rand_states[index];
+	Vector3d color;
+	Ray ray;
+	ray.depth_ = 0;
+	camera->cast_perturbed_ray(ray, index_x, index_y, rand_state);
+
+	Sphere *spheres = *scene;
+
+	double branch_factor = curand_uniform(&rand_state);
+	//clock_t start = clock();
+	trace(ray, spheres, nSpheres, depth, color, rand_state, branch_factor, use_pt);
+	////clock_t end = clock();
+	//
+	//double factor = (end - start) / 1000.0;
+	//Vector3d current_color(factor, 0, 1 - factor);
+
+	color.clamp(Vector3d(0, 0, 0), Vector3d(1, 1, 1));
+
+
+	Vector3d &current_color = buffer_d[index];
+	current_color.multiply(sample);
+	current_color += color;
+	current_color.multiply(__drcp_rn((double)(sample + 1)));
+	ptr[index] = 255 << 24 | static_cast<int>(current_color.x() * 255) << 16  | static_cast<int>(current_color.y() * 255) << 8 | static_cast<int>(current_color.z() * 255);
+}
+
 cudaError_t CudaRayTracer::render(Camera &camera, Sphere **scene, int nSpheres)
 {
 	dim3 block_size;
-	block_size.x = 8;
-	block_size.y = 8;
+	block_size.x = 16;
+	block_size.y =  16;
 
 	dim3 grid_size;
 	grid_size.x = surface_->resolution().x() / block_size.x;
@@ -241,10 +293,11 @@ cudaError_t CudaRayTracer::render(Camera &camera, Sphere **scene, int nSpheres)
 	{
 		CUDA_CALL(cudaMemcpy(camera_d, &camera, sizeof(Camera), cudaMemcpyHostToDevice));
 		current_sample_ = 0;
+		camera.reset_update_flag();
 	}
 
 	surface_->map();
-	raytrace_kernel<<<grid_size, block_size, 0, stream1>>>(static_cast<int*>(surface_->pixel_buffer_object_d()), camera_d, 4, current_sample_++, accumulation_buffer_d_, rand_state_d, surface_->resolution_d(), scene, nSpheres, 0);
+	raytrace_interpolation_kernel<<<grid_size, block_size, 0, stream1>>>(static_cast<int*>(surface_->pixel_buffer_object_d()), camera_d, 2, current_sample_++, accumulation_buffer_d_, rand_state_d, surface_->resolution_d(), scene, nSpheres, 0, use_pathtracing_);
 	//raytrace_kernel<<<grid_size, block_size, 0, stream2>>>(static_cast<int*>(surface_->pixel_buffer_object_d()), camera_d, 4, current_sample_++, accumulation_buffer_d_, rand_state_d, surface_->resolution_d(), scene, nSpheres, 240);
 	//raytrace_kernel<<<grid_size, block_size, 0, stream3>>>(static_cast<int*>(surface_->pixel_buffer_object_d()), camera_d, 4, current_sample_, accumulation_buffer_d_, rand_state_d, surface_->resolution_d(), scene, nSpheres, 240);
 	//raytrace_kernel<<<grid_size, block_size, 0, stream4>>>(static_cast<int*>(surface_->pixel_buffer_object_d()), camera_d, 4, current_sample_++, accumulation_buffer_d_, rand_state_d, surface_->resolution_d(), scene, nSpheres, 360);
@@ -346,7 +399,7 @@ void CudaRayTracer::init_curand(const std::shared_ptr<OpenGLSurface> &surface)
 }
 
 CudaRayTracer::CudaRayTracer()
-	: rand_state_d(nullptr), accumulation_buffer_d_(nullptr), current_sample_(0)
+	: rand_state_d(nullptr), accumulation_buffer_d_(nullptr), current_sample_(0), use_pathtracing_(true)
 {
 	CUDA_CALL(cudaMalloc(&camera_d, sizeof(Camera)));
 
@@ -380,4 +433,9 @@ void CudaRayTracer::init_accumulation_buffer(const std::shared_ptr<OpenGLSurface
 
 	CUDA_CALL(cudaMalloc(&accumulation_buffer_d_, sizeof(Vector3d) * surface->resolution().x() * surface->resolution().y()));
 	CUDA_CALL(cudaMemset(accumulation_buffer_d_, 0, sizeof(Vector3d) * surface->resolution().x() * surface->resolution().y()));
+}
+
+void CudaRayTracer::set_use_pathtracing(const bool value)
+{
+	use_pathtracing_ = value;
 }

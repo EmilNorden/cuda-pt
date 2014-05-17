@@ -25,6 +25,7 @@ template <typename T>
 DeviceList<T>::DeviceList()
 	: nitems_(0), capacity_(8)
 {
+	nitems_ = 0;
 	items_ = new T[capacity_];
 }
 
@@ -44,9 +45,11 @@ void DeviceList<T>::expand()
 	size_t new_capacity = capacity_ * 2;
 	T *new_items = new T[new_capacity];
 
-	for(size_t i = 0; i < nitems_;)
+	for(size_t i = 0; i < nitems_; i++)
+	{
 		new_items[i] = items_[i];
-
+		printf("%d\n", i);
+	}
 	delete[] items_;
 	items_ = new_items;
 	capacity_ = new_capacity;

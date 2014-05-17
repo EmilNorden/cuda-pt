@@ -20,6 +20,7 @@ private:
 	Vector3d v_;
 	bool updated_this_frame_;
 
+	double blur_radius_;
 	double fov_;
 	double aspect_ratio_;
 	Vector2i resolution_;
@@ -61,6 +62,14 @@ public:
 		return direction_;
 	}
 
+	double blur_radius() const {
+		return blur_radius_;
+	}
+
+	void set_blur_radius(const double value) {
+		blur_radius_ = value;
+	}
+
 	CUDA_CALLABLE double focal_length() const {
 		return focal_length_;
 	}
@@ -76,7 +85,7 @@ public:
 	__device__ void cast_ray(Ray &ray, int x, int y) const;
 	__device__ void cast_ray(Ray *ray, int x, int y) const;
 
-	__device__ void cast_perturbed_ray(Ray &ray, int x, int y, double radius, curandState &rand_state) const;
+	__device__ void cast_perturbed_ray(Ray &ray, int x, int y, curandState &rand_state) const;
 
 	void update();
 

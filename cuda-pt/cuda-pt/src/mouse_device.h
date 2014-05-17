@@ -10,6 +10,13 @@ enum MouseButtonState
 	ChangedThisFrame = 4
 };
 
+enum MouseScrollState
+{
+	Up,
+	Down,
+	Idle
+};
+
 class MouseDevice
 {
 private:

@@ -7,5 +7,6 @@ public:
 	Vector3d coordinate;
 	Vector3d surface_normal;
 	double distance;
+	Vector3d object_pos;
 };
 #endif

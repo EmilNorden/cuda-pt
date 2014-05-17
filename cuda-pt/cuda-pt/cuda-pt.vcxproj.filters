@@ -133,5 +133,8 @@
     <ClInclude Include="src\octree.h">
       <Filter>Header files</Filter>
     </ClInclude>
+    <ClInclude Include="src\object.h">
+      <Filter>Header files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

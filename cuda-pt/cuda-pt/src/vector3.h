@@ -13,25 +13,32 @@ class Vector3
 {
 private:
 	T v_[3];
+	T rcp_length_;
 public:
 	CUDA_CALLABLE Vector3() {
 		v_[0] = T();
 		v_[1] = T();
 		v_[2] = T();
+		rcp_length_ = 0;
 	}
 
 	CUDA_CALLABLE Vector3(T x, T y, T z) {
 		v_[0] = x;
 		v_[1] = y;
 		v_[2] = z;
+		rcp_length_ = 1.0 / length();
 	}
 
 	CUDA_CALLABLE Vector3(const Vector3 &vector) {
 		v_[0] = vector.v_[0];
 		v_[1] = vector.v_[1];
 		v_[2] = vector.v_[2];
+		rcp_length_ = 1.0 / length();
 	}
-	
+
+	CUDA_CALLABLE rcp_length() const {
+		return rcp_length_;
+	}
 
 	CUDA_CALLABLE T& x() {
 		return v_[0];
@@ -208,9 +215,9 @@ public:
 
 	__device__ static Vector3 rand_unit_in_hemisphere(const Vector3 &normal, curandState &state)
 	{
-		double mt_x = (curand_uniform(&state) * 2) - 1.0;
-		double mt_y = (curand_uniform(&state) * 2) - 1.0;
-		double mt_z = (curand_uniform(&state) * 2) - 1.0;
+		double mt_x = (curand_uniform(&state)) - 0.5;
+		double mt_y = (curand_uniform(&state)) - 0.5;
+		double mt_z = (curand_uniform(&state)) - 0.5;
 
 		Vector3 vector(mt_x, mt_y, mt_z);
 		vector.normalize_device();

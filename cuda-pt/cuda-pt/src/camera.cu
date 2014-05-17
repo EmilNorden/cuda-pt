@@ -52,14 +52,14 @@ void Camera::cast_ray(Ray &ray, int x, int y) const {
 	ray.direction_.normalize_device();
 }
 
-__device__ void Camera::cast_perturbed_ray(Ray &ray, int x, int y, double radius, curandState &rand_state) const
+__device__ void Camera::cast_perturbed_ray(Ray &ray, int x, int y, curandState &rand_state) const
 {
 	cast_ray(ray, x, y);
 
 	Vector3d focus_point = position_ + ray.direction_ * focal_length_;
 
 	double angle = curand_uniform(&rand_state) * PI * 2;
-	double length = curand_uniform(&rand_state) * radius;
+	double length = curand_uniform(&rand_state) * blur_radius_;
 
 	ray.origin_ = position_ + (u_ * sin(angle) * length) + (v_ * cos(angle) * length);
 	ray.direction_ = focus_point - ray.origin_;

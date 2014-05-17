@@ -13,6 +13,7 @@ class Sphere;
 class CudaRayTracer
 {
 private:
+	bool use_pathtracing_;
 	curandState *rand_state_d;
 	Camera *camera_d;
 	Vector3d *accumulation_buffer_d_;
@@ -33,6 +34,9 @@ public:
 	cudaError_t get_camera_distance(Camera &camera, const Vector2i &screen_coord, Sphere **scene, int n_spheres, double &dist_out);
 
 	void set_surface(const std::shared_ptr<OpenGLSurface> &surface);
+	void set_use_pathtracing(const bool value);
+
+	size_t get_current_sample() const { return current_sample_; }
 };
 
 #endif
